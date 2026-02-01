@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npx prisma generate && npx nest build",
+  "installCommand": "npm install",
+  "outputDirectory": "dist"
+}
