@@ -1,48 +1,39 @@
-import { IsNotEmpty, IsNumber, IsString, IsOptional, Min, Max, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, IsOptional, Min, Max } from 'class-validator';
 
 export class CreateTripDto {
   @IsNotEmpty()
   @IsNumber()
   @Min(-90)
   @Max(90)
-  pickupLatitude: number;
+  startLatitude: number;
 
   @IsNotEmpty()
   @IsNumber()
   @Min(-180)
   @Max(180)
-  pickupLongitude: number;
+  startLongitude: number;
 
   @IsNotEmpty()
   @IsString()
-  pickupAddress: string;
+  startAddress: string;
 
   @IsNotEmpty()
   @IsNumber()
   @Min(-90)
   @Max(90)
-  destinationLatitude: number;
+  endLatitude: number;
 
   @IsNotEmpty()
   @IsNumber()
   @Min(-180)
   @Max(180)
-  destinationLongitude: number;
+  endLongitude: number;
 
   @IsNotEmpty()
   @IsString()
-  destinationAddress: string;
+  endAddress: string;
 
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @IsOptional()
-  @IsEnum(['sedan', 'suv', 'minivan', 'luxury'])
-  vehicleType?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  passengerCount?: number;
 }

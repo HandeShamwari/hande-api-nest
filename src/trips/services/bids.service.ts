@@ -18,24 +18,24 @@ export class BidsService {
    */
   async createBid(tripId: string, userId: string, createBidDto: CreateBidDto) {
     try {
-      const driver = await this.prisma.tableDriver.findFirst({
+      const driver = await this.prisma.driver.findFirst({
         where: { userId },
-        include: { activeVehicle: true },
+        include: { vehicles: { where: { status: 'approved' }, take: 1 } },
       });
 
       if (!driver) {
         throw new BadRequestException('Driver profile not found');
       }
 
-      if (driver.subscriptionStatus !== 'active') {
+      if (driver.dailyFeeStatus !== 'paid') {
         throw new BadRequestException('Active subscription required to place bids');
       }
 
-      if (!driver.activeVehicle) {
-        throw new BadRequestException('Please activate a vehicle first');
+      if (!driver.vehicles || driver.vehicles.length === 0) {
+        throw new BadRequestException('Please add and activate a vehicle first');
       }
 
-      const trip = await this.prisma.tableTrip.findUnique({
+      const trip = await this.prisma.trip.findUnique({
         where: { id: tripId },
       });
 
@@ -48,7 +48,7 @@ export class BidsService {
       }
 
       // Check if driver already has a bid
-      const existingBid = await this.prisma.tableBid.findFirst({
+      const existingBid = await this.prisma.bid.findFirst({
         where: {
           tripId,
           driverId: driver.id,
@@ -59,13 +59,13 @@ export class BidsService {
         throw new BadRequestException('You have already placed a bid on this trip');
       }
 
-      const bid = await this.prisma.tableBid.create({
+      const bid = await this.prisma.bid.create({
         data: {
           tripId,
           driverId: driver.id,
-          proposedFare: createBidDto.proposedFare.toFixed(2),
+          amount: createBidDto.amount.toFixed(2),
           message: createBidDto.message,
-          estimatedArrivalMinutes: createBidDto.estimatedArrivalMinutes,
+          estimatedArrivalTime: createBidDto.estimatedArrivalTime,
           status: 'pending',
         },
         include: {
@@ -79,7 +79,7 @@ export class BidsService {
                   phone: true,
                 },
               },
-              activeVehicle: true,
+              vehicles: { where: { status: 'approved' }, take: 1 },
             },
           },
         },
@@ -98,7 +98,7 @@ export class BidsService {
    * Get all bids for a trip
    */
   async getTripBids(tripId: string, userId: string) {
-    const trip = await this.prisma.tableTrip.findUnique({
+    const trip = await this.prisma.trip.findUnique({
       where: { id: tripId },
     });
 
@@ -107,7 +107,7 @@ export class BidsService {
     }
 
     // Verify user is the rider for this trip
-    const rider = await this.prisma.tableRider.findFirst({
+    const rider = await this.prisma.rider.findFirst({
       where: { userId },
     });
 
@@ -115,7 +115,7 @@ export class BidsService {
       throw new BadRequestException('You can only view bids for your own trips');
     }
 
-    const bids = await this.prisma.tableBid.findMany({
+    const bids = await this.prisma.bid.findMany({
       where: { tripId },
       include: {
         driver: {
@@ -127,28 +127,28 @@ export class BidsService {
                 lastName: true,
               },
             },
-            activeVehicle: true,
+            vehicles: { where: { status: 'approved' }, take: 1 },
           },
         },
       },
       orderBy: {
-        proposedFare: 'asc',
+        amount: 'asc',
       },
     });
 
     return bids.map((bid) => ({
       id: bid.id,
-      proposedFare: parseFloat(bid.proposedFare),
+      amount: parseFloat(bid.amount.toString()),
       message: bid.message,
-      estimatedArrivalMinutes: bid.estimatedArrivalMinutes,
+      estimatedArrivalTime: bid.estimatedArrivalTime,
       status: bid.status,
       createdAt: bid.createdAt,
       driver: {
         id: bid.driver.id,
         user: bid.driver.user,
-        rating: bid.driver.rating || 0,
+        rating: parseFloat(bid.driver.rating.toString()) || 0,
         totalTrips: bid.driver.totalTrips || 0,
-        vehicle: bid.driver.activeVehicle,
+        vehicle: bid.driver.vehicles[0] || null,
       },
     }));
   }
@@ -158,7 +158,7 @@ export class BidsService {
    */
   async acceptBid(bidId: string, userId: string) {
     try {
-      const rider = await this.prisma.tableRider.findFirst({
+      const rider = await this.prisma.rider.findFirst({
         where: { userId },
       });
 
@@ -166,13 +166,13 @@ export class BidsService {
         throw new BadRequestException('Rider profile not found');
       }
 
-      const bid = await this.prisma.tableBid.findUnique({
+      const bid = await this.prisma.bid.findUnique({
         where: { id: bidId },
         include: {
           trip: true,
           driver: {
             include: {
-              activeVehicle: true,
+              vehicles: { where: { status: 'approved' }, take: 1 },
             },
           },
         },
@@ -197,25 +197,25 @@ export class BidsService {
       // Update trip and bid in transaction
       const result = await this.prisma.$transaction(async (tx) => {
         // Update trip
-        const updatedTrip = await tx.tableTrip.update({
+        const updatedTrip = await tx.trip.update({
           where: { id: bid.tripId },
           data: {
             driverId: bid.driverId,
-            vehicleId: bid.driver.activeVehicleId,
-            finalFare: bid.proposedFare,
-            status: 'accepted',
-            acceptedAt: new Date(),
+            vehicleId: bid.driver.vehicles[0]?.id || null,
+            finalFare: bid.amount,
+            status: 'driver_assigned',
+            driverAssignedAt: new Date(),
           },
         });
 
         // Update accepted bid
-        await tx.tableBid.update({
+        await tx.bid.update({
           where: { id: bidId },
           data: { status: 'accepted' },
         });
 
         // Reject other bids
-        await tx.tableBid.updateMany({
+        await tx.bid.updateMany({
           where: {
             tripId: bid.tripId,
             id: { not: bidId },
@@ -230,7 +230,7 @@ export class BidsService {
       this.logger.log(`Bid ${bidId} accepted for trip ${bid.tripId}`);
 
       // Return updated trip with driver details
-      const trip = await this.prisma.tableTrip.findUnique({
+      const trip = await this.prisma.trip.findUnique({
         where: { id: bid.tripId },
         include: {
           rider: {
@@ -241,7 +241,7 @@ export class BidsService {
           driver: {
             include: {
               user: true,
-              activeVehicle: true,
+              vehicles: { where: { status: 'approved' }, take: 1 },
             },
           },
         },
@@ -258,7 +258,7 @@ export class BidsService {
    * Get driver's bids
    */
   async getDriverBids(userId: string, status?: string) {
-    const driver = await this.prisma.tableDriver.findFirst({
+    const driver = await this.prisma.driver.findFirst({
       where: { userId },
     });
 
@@ -266,7 +266,7 @@ export class BidsService {
       throw new BadRequestException('Driver profile not found');
     }
 
-    const bids = await this.prisma.tableBid.findMany({
+    const bids = await this.prisma.bid.findMany({
       where: {
         driverId: driver.id,
         ...(status && { status: status as any }),

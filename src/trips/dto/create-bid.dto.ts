@@ -4,7 +4,7 @@ export class CreateBidDto {
   @IsNotEmpty()
   @IsNumber()
   @Min(0)
-  proposedFare: number;
+  amount: number;
 
   @IsOptional()
   @IsString()
@@ -13,5 +13,5 @@ export class CreateBidDto {
   @IsOptional()
   @IsNumber()
   @Min(1)
-  estimatedArrivalMinutes?: number;
+  estimatedArrivalTime?: number;
 }
