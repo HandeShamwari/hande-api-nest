@@ -9,6 +9,7 @@ import { RidersModule } from './riders/riders.module';
 import { HealthModule } from './health/health.module';
 import { TripsModule } from './trips/trips.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     HealthModule,
     TripsModule,
     RealtimeModule,
+    JobsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

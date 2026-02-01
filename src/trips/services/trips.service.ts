@@ -10,13 +10,18 @@ import {
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CreateTripDto } from '../dto/create-trip.dto';
 import { CancelTripDto } from '../dto/cancel-trip.dto';
+import { JobsService } from '../../jobs/services/jobs.service';
 
 @Injectable()
 export class TripsService {
   private readonly logger = new Logger(TripsService.name);
   private realtimeGateway: any; // Lazy loaded to avoid circular dependency
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => JobsService))
+    private jobsService: JobsService,
+  ) {}
 
   /**
    * Calculate fare based on distance
@@ -554,6 +559,16 @@ export class TripsService {
     });
 
     this.logger.log(`Trip ${tripId} completed by driver ${driver.id}`);
+
+    // Schedule rating reminder (24 hours after completion)
+    if (updatedTrip.riderId) {
+      try {
+        await this.jobsService.scheduleRatingReminder(tripId, updatedTrip.riderId);
+        this.logger.debug(`Scheduled rating reminder for trip ${tripId}`);
+      } catch (error) {
+        this.logger.warn(`Failed to schedule rating reminder: ${error.message}`);
+      }
+    }
 
     // Broadcast trip completion
     if (this.realtimeGateway && updatedTrip.rider) {

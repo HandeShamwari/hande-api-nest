@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { SupabaseService } from '../../shared/services/supabase.service';
 import { ConfigService } from '@nestjs/config';
@@ -8,6 +8,7 @@ import {
   UpdateDriverLocationDto,
   DriverStatsResponseDto,
 } from '../dto/driver.dto';
+import { JobsService } from '../../jobs/services/jobs.service';
 
 @Injectable()
 export class DriversService {
@@ -20,6 +21,8 @@ export class DriversService {
     private prisma: PrismaService,
     private config: ConfigService,
     private supabase: SupabaseService,
+    @Inject(forwardRef(() => JobsService))
+    private jobsService: JobsService,
   ) {
     this.dailyFeeAmount = parseFloat(this.config.get('DAILY_FEE_AMOUNT', '1.00'));
     this.graceHours = parseInt(this.config.get('DAILY_FEE_GRACE_HOURS', '6'));
@@ -83,6 +86,14 @@ export class DriversService {
         subscriptionExpiresAt: expiresAt,
       },
     });
+
+    // Schedule expiry warning (2 hours before expiration)
+    try {
+      await this.jobsService.scheduleExpiryWarning(driver.id, expiresAt);
+      this.logger.debug(`Scheduled expiry warning for driver ${driver.id}`);
+    } catch (error) {
+      this.logger.warn(`Failed to schedule expiry warning: ${error.message}`);
+    }
 
     return {
       message: 'Subscription successful',
