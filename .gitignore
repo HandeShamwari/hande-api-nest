@@ -1,0 +1,80 @@
+# Dependencies
+node_modules/
+vendor/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+.nyc_output
+
+# Build outputs
+dist/
+build/
+*.js.map
+*.d.ts.map
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Laravel
+hande-api/storage/
+hande-api/bootstrap/cache/
+hande-api/public/hot
+hande-api/public/storage
+hande-api/.phpunit.result.cache
+
+# React Native / Expo
+hande-app/.expo/
+hande-app/.expo-shared/
+hande-app/android/
+hande-app/ios/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# Prisma
+hande-api-nest/prisma/migrations/
+*.db
+*.db-journal
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+api.log
+nohup.out
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+
+# Backup files
+*.backup
+*.bak
