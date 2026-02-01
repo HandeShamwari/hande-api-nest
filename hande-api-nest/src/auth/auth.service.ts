@@ -53,12 +53,17 @@ export class AuthService {
 
     // Create driver or rider profile based on userType
     if (registerDto.userType === 'driver') {
+      // Set license expiry 5 years from now as default
+      const licenseExpiry = new Date();
+      licenseExpiry.setFullYear(licenseExpiry.getFullYear() + 5);
+      
       await this.prisma.driver.create({
         data: {
           userId: user.id,
           licenseNumber: 'PENDING',
-          licenseExpiryDate: new Date(),
+          licenseExpiryDate: licenseExpiry,
           licenseType: 'B',
+          yearsOfExperience: 0,
         },
       });
     } else if (registerDto.userType === 'rider') {
