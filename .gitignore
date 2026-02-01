@@ -4,6 +4,12 @@ vendor/
 .pnp
 .pnp.js
 
+# Other project folders (this repo is only for the API)
+hande-administration/
+hande-api/
+hande-app/
+hande-landing/
+
 # Testing
 coverage/
 .nyc_output
