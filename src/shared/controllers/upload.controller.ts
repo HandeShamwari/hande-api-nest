@@ -7,9 +7,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { SupabaseService } from '../shared/services/supabase.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { SupabaseService } from '../services/supabase.service';
 
 @Controller('upload')
 @UseGuards(JwtAuthGuard)

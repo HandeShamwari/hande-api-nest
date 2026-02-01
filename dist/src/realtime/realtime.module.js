@@ -1,0 +1,31 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RealtimeModule = void 0;
+const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
+const jwt_1 = require("@nestjs/jwt");
+const supabase_service_1 = require("../shared/services/supabase.service");
+const realtime_gateway_1 = require("./realtime.gateway");
+let RealtimeModule = class RealtimeModule {
+};
+exports.RealtimeModule = RealtimeModule;
+exports.RealtimeModule = RealtimeModule = __decorate([
+    (0, common_1.Module)({
+        imports: [
+            config_1.ConfigModule,
+            jwt_1.JwtModule.register({
+                secret: process.env.JWT_SECRET || 'hande-ride-service-jwt-secret-2026',
+                signOptions: { expiresIn: '7d' },
+            }),
+        ],
+        providers: [supabase_service_1.SupabaseService, realtime_gateway_1.RealtimeGateway],
+        exports: [supabase_service_1.SupabaseService, realtime_gateway_1.RealtimeGateway],
+    })
+], RealtimeModule);
+//# sourceMappingURL=realtime.module.js.map

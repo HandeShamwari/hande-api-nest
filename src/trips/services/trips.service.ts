@@ -391,23 +391,6 @@ export class TripsService {
               user: true,
             },
           },
-      // Broadcast trip status update
-      if (this.realtimeGateway) {
-        await this.realtimeGateway.broadcastTripStatus(tripId, 'driver_assigned', {
-          driverId: driver.id,
-          driverName: `${updatedTrip.driver.user.firstName} ${updatedTrip.driver.user.lastName}`,
-          vehicle: driver.vehicles[0],
-        });
-
-        // Notify rider
-        await this.realtimeGateway.notifyUser(updatedTrip.rider.userId, 'rider', {
-          type: 'trip_accepted',
-          title: 'Driver Assigned',
-          message: `${updatedTrip.driver.user.firstName} is on the way!`,
-          data: { tripId, driverId: driver.id },
-        });
-      }
-
           driver: {
             include: {
               user: true,
@@ -416,6 +399,27 @@ export class TripsService {
           },
         },
       });
+
+      // Broadcast trip status update
+      if (this.realtimeGateway) {
+        try {
+          await this.realtimeGateway.broadcastTripStatus(tripId, 'driver_assigned', {
+            driverId: driver.id,
+            driverName: `${updatedTrip.driver.user.firstName} ${updatedTrip.driver.user.lastName}`,
+            vehicle: driver.vehicles[0],
+          });
+
+          // Notify rider
+          await this.realtimeGateway.notifyUser(updatedTrip.rider.userId, 'rider', {
+            type: 'trip_accepted',
+            title: 'Driver Assigned',
+            message: `${updatedTrip.driver.user.firstName} is on the way!`,
+            data: { tripId, driverId: driver.id },
+          });
+        } catch (error) {
+          this.logger.warn(`Failed to broadcast trip acceptance: ${error.message}`);
+        }
+      }
 
       this.logger.log(`Trip ${tripId} accepted by driver ${driver.id}`);
 
@@ -677,13 +681,6 @@ export class TripsService {
     });
 
     if (!driver) {
-
-  /**
-   * Set realtime gateway (to avoid circular dependency)
-   */
-  setRealtimeGateway(gateway: any) {
-    this.realtimeGateway = gateway;
-  }
       throw new BadRequestException('Driver profile not found');
     }
 
@@ -714,5 +711,12 @@ export class TripsService {
     });
 
     return trips;
+  }
+
+  /**
+   * Set realtime gateway (to avoid circular dependency)
+   */
+  setRealtimeGateway(gateway: any) {
+    this.realtimeGateway = gateway;
   }
 }
