@@ -3,7 +3,7 @@
 ## 🌐 Live URLs
 
 ### API (Backend)
-- **URL**: https://handeshamwari-transport-hande-c85e.vercel.app
+- **URL**: https://handeshamwari-transport-hande-api.vercel.app
 - **Tech**: NestJS + Prisma + TimescaleDB
 - **Endpoints**: `/api/auth/*`, `/api/*`
 - **Region**: Washington DC (iad1)
@@ -42,7 +42,7 @@ DAILY_FEE_GRACE_HOURS=6
 
 #### Mobile App (`hande-app/.env`)
 ```env
-EXPO_PUBLIC_API_URL=https://handeshamwari-transport-hande-c85e.vercel.app/api
+EXPO_PUBLIC_API_URL=https://handeshamwari-transport-hande-api.vercel.app/api
 EXPO_PUBLIC_PUSHER_APP_KEY=86eb2370aaced33a801d
 EXPO_PUBLIC_PUSHER_CLUSTER=us2
 EXPO_PUBLIC_GOOGLE_API_KEY=AIzaSyDjpjf5fKbdac_VvA3n05YrWoPnEnm8OrQ
@@ -50,13 +50,13 @@ EXPO_PUBLIC_GOOGLE_API_KEY=AIzaSyDjpjf5fKbdac_VvA3n05YrWoPnEnm8OrQ
 
 #### Landing Page (`hande-landing/.env`)
 ```env
-VITE_API_URL=https://handeshamwari-transport-hande-c85e.vercel.app/api
+VITE_API_URL=https://handeshamwari-transport-hande-api.vercel.app/api
 VITE_GOOGLE_MAPS_API_KEY=AIzaSyDjpjf5fKbdac_VvA3n05YrWoPnEnm8OrQ
 ```
 
 #### Admin Dashboard (`hande-administration/.env`)
 ```env
-VITE_API_BASE_URL=https://handeshamwari-transport-hande-c85e.vercel.app/api
+VITE_API_BASE_URL=https://handeshamwari-transport-hande-api.vercel.app/api
 VITE_GOOGLE_MAPS_API_KEY=AIzaSyDjpjf5fKbdac_VvA3n05YrWoPnEnm8OrQ
 ```
 
@@ -77,18 +77,18 @@ VITE_GOOGLE_MAPS_API_KEY=AIzaSyDjpjf5fKbdac_VvA3n05YrWoPnEnm8OrQ
 
 ### Health Check
 ```bash
-curl https://handeshamwari-transport-hande-c85e.vercel.app/api
+curl https://handeshamwari-transport-hande-api.vercel.app/api
 # Response: "Hello World!"
 ```
 
 ### Auth Endpoints
 ```bash
 # Test unauthorized access
-curl https://handeshamwari-transport-hande-c85e.vercel.app/api/auth/me
+curl https://handeshamwari-transport-hande-api.vercel.app/api/auth/me
 # Response: {"message":"Unauthorized","statusCode":401}
 
 # Register a new user
-curl -X POST https://handeshamwari-transport-hande-c85e.vercel.app/api/auth/register \
+curl -X POST https://handeshamwari-transport-hande-api.vercel.app/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "driver@example.com",
