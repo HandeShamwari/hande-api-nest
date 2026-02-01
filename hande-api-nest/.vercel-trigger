@@ -7,3 +7,4 @@ This file triggers Vercel deployments when changed.
 - Phase 2: Driver, Rider, Vehicle modules
 - Schema fix: DriverLocation simplified for PostgreSQL
 - All 25+ database tables synced
+# Trigger redeploy after env vars setup
