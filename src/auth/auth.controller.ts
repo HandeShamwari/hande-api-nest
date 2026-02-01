@@ -21,7 +21,17 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  async me(@CurrentUser() user: any) {
-    return this.authService.me(user.id);
+  async me(@CurrentUser('sub') userId: string) {
+    return this.authService.me(userId);
+  }
+
+  @Get('debug')
+  @UseGuards(JwtAuthGuard)
+  async debug(@CurrentUser() user: any) {
+    return {
+      fullUser: user,
+      sub: user?.sub,
+      id: user?.id,
+    };
   }
 }
