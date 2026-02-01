@@ -7,6 +7,8 @@ import { SharedModule } from './shared/shared.module';
 import { DriversModule } from './drivers/drivers.module';
 import { RidersModule } from './riders/riders.module';
 import { HealthModule } from './health/health.module';
+import { TripsModule } from './trips/trips.module';
+import { BidsModule } from './bids/bids.module';
 
 @Module({
   imports: [
@@ -19,6 +21,8 @@ import { HealthModule } from './health/health.module';
     DriversModule,
     RidersModule,
     HealthModule,
+    TripsModule,
+    BidsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
