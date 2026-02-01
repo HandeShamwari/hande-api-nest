@@ -123,10 +123,10 @@ export class TripsService {
         estimatedFare: parseFloat(trip.estimatedFare.toString()),
         notes: trip.notes,
         createdAt: trip.createdAt,
-        rider: {
+        rider: trip.rider ? {
           id: trip.rider.id,
           user: trip.rider.user,
-        },
+        } : null,
       };
     } catch (error) {
       this.logger.error(`Failed to create trip: ${error.message}`, error.stack);
@@ -135,9 +135,16 @@ export class TripsService {
   }
 
   /**
-   * Get trip details
+   * Get trip details (alias for getTripById)
    */
   async getTrip(tripId: string, userId: string) {
+    return this.getTripById(tripId, userId);
+  }
+
+  /**
+   * Get trip details by ID
+   */
+  async getTripById(tripId: string, userId: string) {
     const trip = await this.prisma.trip.findUnique({
       where: { id: tripId },
       include: {
@@ -200,6 +207,10 @@ export class TripsService {
 
     // Verify user has access to this trip
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    
+    if (!user) {
+      throw new ForbiddenException('User not found');
+    }
     
     if (user.userType === 'rider') {
       const rider = await this.prisma.rider.findFirst({ where: { userId } });
@@ -278,8 +289,8 @@ export class TripsService {
       const nearbyTrips = allTrips
         .map((trip) => {
           const distance = this.calculateDistance(
-            parseFloat(driver.currentLatitude.toString()),
-            parseFloat(driver.currentLongitude.toString()),
+            parseFloat(driver.currentLatitude!.toString()),
+            parseFloat(driver.currentLongitude!.toString()),
             parseFloat(trip.startLatitude.toString()),
             parseFloat(trip.startLongitude.toString()),
           );
@@ -303,8 +314,8 @@ export class TripsService {
         hasBid: trip.hasBid,
         createdAt: trip.createdAt,
         rider: {
-          firstName: trip.rider.user.firstName,
-          rating: parseFloat(trip.rider.rating.toString()) || 0,
+          firstName: trip.rider?.user.firstName || 'Unknown',
+          rating: trip.rider ? parseFloat(trip.rider.rating.toString()) : 0,
         },
       }));
     } catch (error) {
@@ -384,6 +395,24 @@ export class TripsService {
         error.stack,
       );
       throw error;
+    }
+  }
+
+  /**
+   * Update trip status (start, complete, cancel)
+   */
+  async updateTripStatus(tripId: string, userId: string, dto: any) {
+    const { status, reason } = dto;
+
+    switch (status) {
+      case 'in_progress':
+        return this.startTrip(tripId, userId);
+      case 'completed':
+        return this.completeTrip(tripId, userId);
+      case 'cancelled':
+        return this.cancelTrip(tripId, userId, { reason, cancelledBy: 'driver' });
+      default:
+        throw new BadRequestException(`Invalid status: ${status}`);
     }
   }
 
@@ -487,6 +516,10 @@ export class TripsService {
    */
   async cancelTrip(tripId: string, userId: string, cancelTripDto: CancelTripDto) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      throw new ForbiddenException('User not found');
+    }
 
     const trip = await this.prisma.trip.findUnique({
       where: { id: tripId },
