@@ -15,6 +15,17 @@ import { SharedModule } from '../shared/shared.module';
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
+        // Support both REDIS_URL and individual env vars
+        const redisUrl = configService.get('REDIS_URL');
+        
+        if (redisUrl) {
+          // Use Redis URL (e.g., rediss://default:password@host:6379)
+          return {
+            redis: redisUrl,
+          };
+        }
+        
+        // Fallback to individual env vars
         const redisTls = configService.get('REDIS_TLS', 'false') === 'true';
         return {
           redis: {
