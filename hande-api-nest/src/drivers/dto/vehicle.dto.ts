@@ -21,6 +21,10 @@ export class CreateVehicleDto {
 
   @IsNumber()
   @IsOptional()
+  capacity?: number;
+
+  @IsNumber()
+  @IsOptional()
   seats?: number;
 
   @IsString()
