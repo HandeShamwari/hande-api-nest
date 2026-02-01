@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { SupabaseService } from '../../shared/services/supabase.service';
 import { ConfigService } from '@nestjs/config';
 import {
   SubscribeDriverDto,
@@ -13,13 +14,22 @@ export class DriversService {
   private readonly logger = new Logger(DriversService.name);
   private readonly dailyFeeAmount: number;
   private readonly graceHours: number;
+  private realtimeGateway: any; // Lazy loaded
 
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private supabase: SupabaseService,
   ) {
     this.dailyFeeAmount = parseFloat(this.config.get('DAILY_FEE_AMOUNT', '1.00'));
     this.graceHours = parseInt(this.config.get('DAILY_FEE_GRACE_HOURS', '6'));
+  }
+
+  /**
+   * Set realtime gateway (injected to avoid circular dependency)
+   */
+  setRealtimeGateway(gateway: any) {
+    this.realtimeGateway = gateway;
   }
 
   /**
@@ -189,14 +199,51 @@ export class DriversService {
     });
 
     // Update driver's current location
-    await this.prisma.driver.update({
+    const updatedDriver = await this.prisma.driver.update({
       where: { id: driver.id },
       data: {
         currentLatitude: dto.latitude,
         currentLongitude: dto.longitude,
         lastLocationUpdate: new Date(),
       },
+      include: {
+        trips: {
+          where: {
+            status: { in: ['accepted', 'ongoing'] },
+          },
+        },
+      },
     });
+
+    // Broadcast location update via Supabase Realtime
+    const locationData = {
+      driverId: driver.id,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      heading: dto.heading,
+      speed: dto.speed,
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      await this.supabase.broadcastDriverLocation(driver.id, locationData);
+      this.logger.debug(`Broadcasted location for driver ${driver.id}`);
+    } catch (error) {
+      this.logger.warn(`Failed to broadcast location: ${error.message}`);
+    }
+
+    // If driver is on an active trip, broadcast to trip room
+    const activeTrip = updatedDriver.trips[0];
+    if (activeTrip && this.realtimeGateway) {
+      try {
+        this.realtimeGateway.server
+          .to(`trip_${activeTrip.id}`)
+          .emit('driver_location', locationData);
+        this.logger.debug(`Broadcasted location to trip room: trip_${activeTrip.id}`);
+      } catch (error) {
+        this.logger.warn(`Failed to broadcast to trip room: ${error.message}`);
+      }
+    }
 
     return {
       message: 'Location updated successfully',
@@ -348,5 +395,12 @@ export class DriversService {
       this.logger.error(`Error getting driver profile: ${error.message}`, error.stack);
       throw error;
     }
+  }
+
+  /**
+   * Set realtime gateway (to avoid circular dependency)
+   */
+  setRealtimeGateway(gateway: any) {
+    this.realtimeGateway = gateway;
   }
 }

@@ -4,6 +4,8 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CreateTripDto } from '../dto/create-trip.dto';
@@ -12,6 +14,7 @@ import { CancelTripDto } from '../dto/cancel-trip.dto';
 @Injectable()
 export class TripsService {
   private readonly logger = new Logger(TripsService.name);
+  private realtimeGateway: any; // Lazy loaded to avoid circular dependency
 
   constructor(private prisma: PrismaService) {}
 
@@ -113,6 +116,17 @@ export class TripsService {
       });
 
       this.logger.log(`Trip created: ${trip.id} by rider ${rider.id}`);
+
+      // Notify nearby drivers about new trip (will be handled by realtime gateway)
+      if (this.realtimeGateway) {
+        await this.realtimeGateway.broadcastToDrivers('trip:new', {
+          tripId: trip.id,
+          startAddress: trip.startAddress,
+          endAddress: trip.endAddress,
+          estimatedFare: parseFloat(trip.estimatedFare.toString()),
+          distance: parseFloat(trip.distance.toString()),
+        });
+      }
 
       return {
         id: trip.id,
@@ -377,6 +391,23 @@ export class TripsService {
               user: true,
             },
           },
+      // Broadcast trip status update
+      if (this.realtimeGateway) {
+        await this.realtimeGateway.broadcastTripStatus(tripId, 'driver_assigned', {
+          driverId: driver.id,
+          driverName: `${updatedTrip.driver.user.firstName} ${updatedTrip.driver.user.lastName}`,
+          vehicle: driver.vehicles[0],
+        });
+
+        // Notify rider
+        await this.realtimeGateway.notifyUser(updatedTrip.rider.userId, 'rider', {
+          type: 'trip_accepted',
+          title: 'Driver Assigned',
+          message: `${updatedTrip.driver.user.firstName} is on the way!`,
+          data: { tripId, driverId: driver.id },
+        });
+      }
+
           driver: {
             include: {
               user: true,
@@ -426,6 +457,13 @@ export class TripsService {
 
     if (!driver) {
       throw new BadRequestException('Driver profile not found');
+    // Broadcast trip status
+    if (this.realtimeGateway) {
+      await this.realtimeGateway.broadcastTripStatus(tripId, 'in_progress', {
+        startedAt: updatedTrip.startedAt,
+      });
+    }
+
     }
 
     const trip = await this.prisma.trip.findUnique({
@@ -484,7 +522,23 @@ export class TripsService {
     if (trip.status !== 'in_progress') {
       throw new BadRequestException('Trip is not in progress');
     }
+// Broadcast trip completion
+    if (this.realtimeGateway) {
+      await this.realtimeGateway.broadcastTripStatus(tripId, 'completed', {
+        completedAt: updatedTrip.completedAt,
+        finalFare: updatedTrip.finalFare,
+      });
 
+      // Notify rider
+      await this.realtimeGateway.notifyUser(updatedTrip.rider.userId, 'rider', {
+        type: 'trip_completed',
+        title: 'Trip Completed',
+        message: 'Your trip has been completed. Please rate your driver.',
+        data: { tripId, finalFare: updatedTrip.finalFare },
+      });
+    }
+
+    
     const updatedTrip = await this.prisma.trip.update({
       where: { id: tripId },
       data: {
@@ -539,6 +593,14 @@ export class TripsService {
       if (trip.riderId !== rider?.id) {
         throw new ForbiddenException('You cannot cancel this trip');
       }
+    // Broadcast cancellation
+    if (this.realtimeGateway) {
+      await this.realtimeGateway.broadcastTripStatus(tripId, 'cancelled', {
+        cancelledBy: cancelTripDto.cancelledBy || user.userType,
+        reason: cancelTripDto.reason,
+      });
+    }
+
     } else if (user.userType === 'driver') {
       const driver = await this.prisma.driver.findFirst({ where: { userId } });
       if (trip.driverId !== driver?.id) {
@@ -615,6 +677,13 @@ export class TripsService {
     });
 
     if (!driver) {
+
+  /**
+   * Set realtime gateway (to avoid circular dependency)
+   */
+  setRealtimeGateway(gateway: any) {
+    this.realtimeGateway = gateway;
+  }
       throw new BadRequestException('Driver profile not found');
     }
 

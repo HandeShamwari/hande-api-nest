@@ -8,6 +8,7 @@ import { DriversModule } from './drivers/drivers.module';
 import { RidersModule } from './riders/riders.module';
 import { HealthModule } from './health/health.module';
 import { TripsModule } from './trips/trips.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { TripsModule } from './trips/trips.module';
     RidersModule,
     HealthModule,
     TripsModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
