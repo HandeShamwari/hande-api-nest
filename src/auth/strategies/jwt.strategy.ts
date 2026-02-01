@@ -35,6 +35,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid or inactive user');
     }
 
-    return user;
+    // Return payload with user data
+    // This allows @CurrentUser('sub') to work correctly
+    return {
+      sub: user.id, // Add sub field for @CurrentUser('sub')
+      ...user,
+    };
   }
 }
