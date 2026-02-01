@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../lib/api';
 import { Card, CardHeader, CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { Search, Plus, Edit, Trash2, CheckCircle, XCircle, Clock, Eye, CheckSquare } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Clock, Eye, CheckSquare } from 'lucide-react';
 import { DriverDetailModal } from '../components/driver/DriverDetailModal';
 import { BulkApprovalPanel } from '../components/driver/BulkApprovalPanel';
 

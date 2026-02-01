@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
-import { TrendingUp, Users, Eye, Clock, AlertTriangle } from 'lucide-react';
+import { TrendingUp, Users, Eye, AlertTriangle } from 'lucide-react';
 
 interface WeeklyTrend {
   week_start: string;

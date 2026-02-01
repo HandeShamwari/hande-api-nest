@@ -6,7 +6,6 @@ import {
   Car,
   Headphones,
   DollarSign,
-  FileText,
   BarChart3,
   Settings,
   LogOut,
