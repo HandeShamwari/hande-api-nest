@@ -2,12 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "prisma generate && nest build",
   "installCommand": "npm install",
-  "outputDirectory": "dist",
-  "framework": null,
-  "functions": {
-    "dist/main.js": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  }
+  "outputDirectory": "dist"
 }
