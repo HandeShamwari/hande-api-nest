@@ -21,12 +21,27 @@ Hande uses Redis for background job processing with Bull queues. This guide show
 
 ---
 
-## 🚀 Step 1: Get Your Redis Password
+## 🚀 Step 1: Get Your Redis Password (TCP Connection)
 
-1. Go to [Upstash Console](https://console.upstash.io/redis/d41d8cd9-8f00-3204-a980-0998ecf8427e)
-2. Under **Details** tab, find **Token / Readonly Token**
-3. Click the 👁️ (eye icon) next to **TOKEN** to reveal the password
-4. Copy the password value (starts with `A...`)
+**⚠️ Important**: Bull uses **TCP connections**, not REST API. Make sure you get the TCP password!
+
+### Finding the TCP Password:
+
+1. Go to [Upstash Console](https://console.upstash.io/)
+2. Click on your **hande** database
+3. Under **Details** tab, look for the **Connect** section
+4. Click on **TCP** tab (not REST)
+5. You'll see a command like:
+   ```
+   redis-cli --tls -u redis://default:********@solid-osprey-44789.upstash.io:6379
+   ```
+6. The `********` part is your password - click to reveal it
+7. Copy the password (it's different from the REST token!)
+
+### What NOT to use:
+- ❌ `UPSTASH_REDIS_REST_URL` - This is for REST API only
+- ❌ `UPSTASH_REDIS_REST_TOKEN` - This is for REST API only  
+- ✅ Use the TCP password shown in the `redis-cli` command
 
 ---
 
@@ -41,11 +56,13 @@ Add these 4 variables:
 ```
 REDIS_HOST=solid-osprey-44789.upstash.io
 REDIS_PORT=6379
-REDIS_PASSWORD=[paste the Token you copied from Upstash]
+REDIS_PASSWORD=[paste the TCP password from redis-cli command, NOT the REST token]
 REDIS_TLS=true
 ```
 
-**Important**: Set environment for **Production**, **Preview**, and **Development**
+**Important**: 
+- Set environment for **Production**, **Preview**, and **Development**
+- Use the **TCP password**, not `UPSTASH_REDIS_REST_TOKEN`
 
 ---
 
