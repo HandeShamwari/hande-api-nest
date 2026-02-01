@@ -576,7 +576,7 @@ enum BidStatus {
 // ============================================================================
 
 model DriverLocation {
-  id         BigInt   @default(autoincrement())
+  id         String   @id @default(uuid()) @db.Uuid
   driverId   String   @map("driver_id") @db.Uuid
   latitude   Decimal  @db.Decimal(10, 8)
   longitude  Decimal  @db.Decimal(11, 8)
@@ -588,7 +588,6 @@ model DriverLocation {
   // Relations
   driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
-  @@id([id, recordedAt])
   @@index([driverId, recordedAt])
   @@index([recordedAt])
   @@map("driver_locations")
