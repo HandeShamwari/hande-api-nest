@@ -57,6 +57,7 @@ export class DriversService {
       data: {
         driverId: driver.id,
         amount,
+        feeDate: now,
         paidAt: now,
         expiresAt,
         status: 'paid',
