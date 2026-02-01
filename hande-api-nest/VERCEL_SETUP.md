@@ -12,8 +12,9 @@ Add the following variables for **Production**, **Preview**, and **Development**
 
 ### 1. DATABASE_URL (REQUIRED)
 ```
-postgres://tsdbadmin:PASSWORD_HERE@qviwk2ldus.clb1ydj108.tsdb.cloud.timescale.com:38051/tsdb?sslmode=require
+postgres://tsdbadmin:PASSWORD_HERE@qviwk2ldus.clb1ydj108.tsdb.cloud.timescale.com:38051/tsdb?sslmode=no-verify
 ```
+**CRITICAL**: Use `sslmode=no-verify` (not `require`) to avoid SSL certificate validation errors with TimescaleDB Cloud.  
 **Note**: Replace `PASSWORD_HERE` with actual TimescaleDB password
 
 ### 2. JWT_SECRET (REQUIRED)
