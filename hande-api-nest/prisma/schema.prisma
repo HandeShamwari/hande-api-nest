@@ -89,9 +89,12 @@ model Driver {
   currentLongitude     Decimal?       @map("current_longitude") @db.Decimal(11, 8)
   currentHeading       Int?           @map("current_heading")
   lastLocationUpdate   DateTime?      @map("last_location_update") @db.Timestamptz
+  rating               Decimal        @default(0.00) @db.Decimal(3, 2)
+  totalTrips           Int            @default(0) @map("total_trips")
   averageRating        Decimal        @default(0.00) @map("average_rating") @db.Decimal(3, 2)
   totalEarnings        Decimal        @default(0.00) @map("total_earnings") @db.Decimal(12, 2)
   walletBalance        Decimal        @default(0.00) @map("wallet_balance") @db.Decimal(12, 2)
+  subscriptionExpiresAt DateTime?     @map("subscription_expires_at") @db.Timestamptz
   dailyFeeStatus       DailyFeeStatus @default(paid) @map("daily_fee_status")
   dailyFeePaidAt       DateTime?      @map("daily_fee_paid_at") @db.Timestamptz
   dailyFeeDueAt        DateTime?      @map("daily_fee_due_at") @db.Timestamptz
@@ -158,8 +161,11 @@ model DriverVehicle {
   insuranceDocument          String?   @map("insurance_document") @db.VarChar(255)
   type                       String    @db.VarChar(50)
   capacity                   Int
+  seats                      Int       @default(4)
   isActive                   Boolean   @default(true) @map("is_active")
+  photo                      String?   @db.VarChar(255)
   photos                     String?   @db.Text
+  status                     VehicleStatus @default(pending_approval)
   inspectionStatus           String?   @map("inspection_status") @db.VarChar(50)
   inspectionExpiry           DateTime? @map("inspection_expiry") @db.Date
   insuranceExpiry            DateTime? @map("insurance_expiry") @db.Date
@@ -337,6 +343,7 @@ model DailyFee {
   status           FeeStatus      @default(pending)
   feeDate          DateTime       @map("fee_date") @db.Date
   dueAt            DateTime?      @map("due_at") @db.Timestamptz
+  expiresAt        DateTime?      @map("expires_at") @db.Timestamptz
   gracePeriodEndsAt DateTime?     @map("grace_period_ends_at") @db.Timestamptz
   paidAt           DateTime?      @map("paid_at") @db.Timestamptz
   paymentMethodId  String?        @map("payment_method_id") @db.Uuid
@@ -366,6 +373,12 @@ enum FeeStatus {
   waived
 }
 
+enum VehicleStatus {
+  pending_approval
+  approved
+  rejected
+}
+
 // ============================================================================
 // RIDER SYSTEM
 // ============================================================================
@@ -377,6 +390,7 @@ model Rider {
   currentLatitude      Decimal?  @map("current_latitude") @db.Decimal(10, 8)
   currentLongitude     Decimal?  @map("current_longitude") @db.Decimal(11, 8)
   lastLocationUpdate   DateTime? @map("last_location_update") @db.Timestamptz
+  rating               Decimal   @default(0.00) @db.Decimal(3, 2)
   averageRating        Decimal   @default(0.00) @map("average_rating") @db.Decimal(3, 2)
   totalTrips           Int       @default(0) @map("total_trips")
   paymentPreferences   String?   @map("payment_preferences") @db.Text
@@ -455,6 +469,8 @@ model Trip {
   endLongitude        Decimal     @map("end_longitude") @db.Decimal(11, 8)
   startAddress        String      @map("start_address") @db.VarChar(255)
   endAddress          String      @map("end_address") @db.VarChar(255)
+  pickupAddress       String?     @map("pickup_address") @db.VarChar(255)
+  destinationAddress  String?     @map("destination_address") @db.VarChar(255)
   
   // Trip metrics
   distance            Decimal     @db.Decimal(8, 2)

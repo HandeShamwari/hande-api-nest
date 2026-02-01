@@ -22,7 +22,8 @@ export class RidersService {
             phone: true,
           },
         },
-        savedPlaces: true,
+        emergencyContacts: true,
+        favoriteLocations: true,
       },
     });
 
@@ -33,16 +34,10 @@ export class RidersService {
     return {
       id: rider.id,
       user: rider.user,
-      emergencyContactName: rider.emergencyContactName,
-      emergencyContactPhone: rider.emergencyContactPhone,
-      rating: rider.rating,
+      emergencyContacts: rider.emergencyContacts,
+      rating: Number(rider.averageRating),
       totalTrips: rider.totalTrips,
-      homeAddress: rider.homeAddress,
-      homeLocation: rider.homeLatitude && rider.homeLongitude ? {
-        latitude: rider.homeLatitude,
-        longitude: rider.homeLongitude,
-      } : null,
-      savedPlaces: rider.savedPlaces,
+      favoriteLocations: rider.favoriteLocations,
     };
   }
 
@@ -61,12 +56,7 @@ export class RidersService {
     const updated = await this.prisma.rider.update({
       where: { id: rider.id },
       data: {
-        emergencyContactName: dto.emergencyContactName,
-        emergencyContactPhone: dto.emergencyContactPhone,
-        profilePicture: dto.profilePicture,
-        homeAddress: dto.homeAddress,
-        homeLatitude: dto.homeLatitude,
-        homeLongitude: dto.homeLongitude,
+        // Update basic fields only - emergency contacts managed separately
       },
     });
 
@@ -74,9 +64,6 @@ export class RidersService {
       message: 'Profile updated successfully',
       rider: {
         id: updated.id,
-        emergencyContactName: updated.emergencyContactName,
-        emergencyContactPhone: updated.emergencyContactPhone,
-        homeAddress: updated.homeAddress,
       },
     };
   }
@@ -102,11 +89,11 @@ export class RidersService {
 
     const completedTrips = rider.trips.filter(t => t.status === 'completed');
     const cancelledTrips = rider.trips.filter(t => t.status === 'cancelled');
-    const totalSpent = completedTrips.reduce((sum, trip) => sum + (trip.finalFare || 0), 0);
+    const totalSpent = completedTrips.reduce((sum, trip) => sum + (trip.finalFare ? Number(trip.finalFare) : 0), 0);
 
     // Get favorite destinations (top 5)
     const destinationCounts = completedTrips.reduce((acc, trip) => {
-      const dest = trip.destinationAddress || 'Unknown';
+      const dest = trip.endAddress || 'Unknown';
       acc[dest] = (acc[dest] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -121,7 +108,7 @@ export class RidersService {
       completedTrips: completedTrips.length,
       cancelledTrips: cancelledTrips.length,
       totalSpent,
-      averageRating: rider.rating || 0,
+      averageRating: Number(rider.averageRating) || 0,
       favoriteDestinations,
     };
   }
@@ -159,14 +146,14 @@ export class RidersService {
     return trips.map(trip => ({
       id: trip.id,
       status: trip.status,
-      pickupAddress: trip.pickupAddress,
-      destinationAddress: trip.destinationAddress,
-      fare: trip.finalFare || trip.estimatedFare,
+      startAddress: trip.startAddress,
+      endAddress: trip.endAddress,
+      fare: trip.finalFare ? Number(trip.finalFare) : Number(trip.estimatedFare),
       createdAt: trip.createdAt,
       completedAt: trip.completedAt,
       driver: trip.driver ? {
         name: `${trip.driver.user.firstName} ${trip.driver.user.lastName}`,
-        rating: trip.driver.rating,
+        rating: Number(trip.driver.averageRating),
       } : null,
     }));
   }

@@ -20,7 +20,7 @@ export class VehiclesService {
     }
 
     // Check if license plate already exists
-    const existing = await this.prisma.vehicle.findUnique({
+    const existing = await this.prisma.driverVehicle.findUnique({
       where: { licensePlate: dto.licensePlate },
     });
 
@@ -29,7 +29,7 @@ export class VehiclesService {
     }
 
     // Create vehicle
-    const vehicle = await this.prisma.vehicle.create({
+    const vehicle = await this.prisma.driverVehicle.create({
       data: {
         driverId: driver.id,
         make: dto.make,
@@ -99,7 +99,7 @@ export class VehiclesService {
       throw new NotFoundException('Driver profile not found');
     }
 
-    const vehicle = await this.prisma.vehicle.findFirst({
+    const vehicle = await this.prisma.driverVehicle.findFirst({
       where: {
         id: vehicleId,
         driverId: driver.id,
@@ -125,7 +125,7 @@ export class VehiclesService {
       throw new NotFoundException('Driver profile not found');
     }
 
-    const vehicle = await this.prisma.vehicle.findFirst({
+    const vehicle = await this.prisma.driverVehicle.findFirst({
       where: {
         id: vehicleId,
         driverId: driver.id,
@@ -138,7 +138,7 @@ export class VehiclesService {
 
     // If updating license plate, check for duplicates
     if (dto.licensePlate && dto.licensePlate !== vehicle.licensePlate) {
-      const existing = await this.prisma.vehicle.findUnique({
+      const existing = await this.prisma.driverVehicle.findUnique({
         where: { licensePlate: dto.licensePlate },
       });
 
@@ -147,7 +147,7 @@ export class VehiclesService {
       }
     }
 
-    const updated = await this.prisma.vehicle.update({
+    const updated = await this.prisma.driverVehicle.update({
       where: { id: vehicleId },
       data: {
         color: dto.color,
@@ -174,7 +174,7 @@ export class VehiclesService {
       throw new NotFoundException('Driver profile not found');
     }
 
-    const vehicle = await this.prisma.vehicle.findFirst({
+    const vehicle = await this.prisma.driverVehicle.findFirst({
       where: {
         id: vehicleId,
         driverId: driver.id,
@@ -185,7 +185,7 @@ export class VehiclesService {
       throw new NotFoundException('Vehicle not found');
     }
 
-    await this.prisma.vehicle.delete({
+    await this.prisma.driverVehicle.delete({
       where: { id: vehicleId },
     });
 
@@ -206,7 +206,7 @@ export class VehiclesService {
       throw new NotFoundException('Driver profile not found');
     }
 
-    const vehicle = await this.prisma.vehicle.findFirst({
+    const vehicle = await this.prisma.driverVehicle.findFirst({
       where: {
         id: vehicleId,
         driverId: driver.id,
@@ -222,7 +222,7 @@ export class VehiclesService {
     }
 
     // Deactivate all other vehicles
-    await this.prisma.vehicle.updateMany({
+    await this.prisma.driverVehicle.updateMany({
       where: {
         driverId: driver.id,
         isActive: true,
@@ -233,7 +233,7 @@ export class VehiclesService {
     });
 
     // Activate this vehicle
-    await this.prisma.vehicle.update({
+    await this.prisma.driverVehicle.update({
       where: { id: vehicleId },
       data: {
         isActive: true,

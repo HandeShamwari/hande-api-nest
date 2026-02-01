@@ -63,11 +63,11 @@ export class DriversService {
       },
     });
 
-    // Update driver status to active
+    // Update driver status to available
     await this.prisma.driver.update({
       where: { id: driver.id },
       data: {
-        status: 'active',
+        status: 'available',
         subscriptionExpiresAt: expiresAt,
       },
     });
@@ -136,6 +136,7 @@ export class DriversService {
   async updateProfile(userId: string, dto: UpdateDriverProfileDto) {
     const driver = await this.prisma.driver.findUnique({
       where: { userId },
+      include: { user: true },
     });
 
     if (!driver) {
@@ -146,9 +147,7 @@ export class DriversService {
       where: { id: driver.id },
       data: {
         licenseNumber: dto.licenseNumber,
-        licenseExpiry: dto.licenseExpiry ? new Date(dto.licenseExpiry) : undefined,
-        profilePicture: dto.profilePicture,
-        idDocument: dto.idDocument,
+        licenseExpiryDate: dto.licenseExpiry ? new Date(dto.licenseExpiry) : undefined,
       },
     });
 
@@ -157,8 +156,7 @@ export class DriversService {
       driver: {
         id: updated.id,
         licenseNumber: updated.licenseNumber,
-        licenseExpiry: updated.licenseExpiry,
-        profilePicture: updated.profilePicture,
+        licenseExpiryDate: updated.licenseExpiryDate,
         status: updated.status,
       },
     };
@@ -233,7 +231,7 @@ export class DriversService {
 
     const completedTrips = driver.trips.filter(t => t.status === 'completed');
     const cancelledTrips = driver.trips.filter(t => t.status === 'cancelled');
-    const totalEarnings = completedTrips.reduce((sum, trip) => sum + (trip.finalFare || 0), 0);
+    const totalEarnings = completedTrips.reduce((sum, trip) => sum + (trip.finalFare ? Number(trip.finalFare) : 0), 0);
 
     // Calculate subscription status
     const now = new Date();
@@ -257,7 +255,7 @@ export class DriversService {
       completedTrips: completedTrips.length,
       cancelledTrips: cancelledTrips.length,
       totalEarnings,
-      averageRating: driver.rating || 0,
+      averageRating: Number(driver.averageRating) || 0,
       subscriptionStatus,
       subscriptionExpiresAt: driver.subscriptionExpiresAt,
       currentStreak,
@@ -283,6 +281,7 @@ export class DriversService {
     currentDate.setHours(0, 0, 0, 0);
 
     for (const fee of fees) {
+      if (!fee.paidAt) continue;
       const feeDate = new Date(fee.paidAt);
       feeDate.setHours(0, 0, 0, 0);
 
@@ -327,14 +326,14 @@ export class DriversService {
       id: driver.id,
       user: driver.user,
       licenseNumber: driver.licenseNumber,
-      licenseExpiry: driver.licenseExpiry,
-      rating: driver.rating,
+      licenseExpiryDate: driver.licenseExpiryDate,
+      rating: Number(driver.averageRating),
       totalTrips: driver.totalTrips,
       status: driver.status,
       subscriptionExpiresAt: driver.subscriptionExpiresAt,
       currentLocation: driver.currentLatitude && driver.currentLongitude ? {
-        latitude: driver.currentLatitude,
-        longitude: driver.currentLongitude,
+        latitude: Number(driver.currentLatitude),
+        longitude: Number(driver.currentLongitude),
       } : null,
       vehicles: driver.vehicles,
     };
