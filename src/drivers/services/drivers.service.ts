@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -10,6 +10,7 @@ import {
 
 @Injectable()
 export class DriversService {
+  private readonly logger = new Logger(DriversService.name);
   private readonly dailyFeeAmount: number;
   private readonly graceHours: number;
 
@@ -303,40 +304,49 @@ export class DriversService {
    * Get driver profile
    */
   async getProfile(userId: string) {
-    const driver = await this.prisma.driver.findUnique({
-      where: { userId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true,
+    try {
+      this.logger.log(`Getting profile for userId: ${userId}`);
+      
+      const driver = await this.prisma.driver.findUnique({
+        where: { userId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+            },
           },
+          vehicles: true,
         },
-        vehicles: true,
-      },
-    });
+      });
 
-    if (!driver) {
-      throw new NotFoundException('Driver profile not found');
+      if (!driver) {
+        throw new NotFoundException('Driver profile not found');
+      }
+
+      this.logger.log(`Found driver: ${driver.id}`);
+
+      return {
+        id: driver.id,
+        user: driver.user,
+        licenseNumber: driver.licenseNumber,
+        licenseExpiryDate: driver.licenseExpiryDate,
+        rating: driver.averageRating ? Number(driver.averageRating) : 0,
+        totalTrips: driver.totalTrips || 0,
+        status: driver.status,
+        subscriptionExpiresAt: driver.subscriptionExpiresAt,
+        currentLocation: driver.currentLatitude && driver.currentLongitude ? {
+          latitude: Number(driver.currentLatitude),
+          longitude: Number(driver.currentLongitude),
+        } : null,
+        vehicles: driver.vehicles || [],
+      };
+    } catch (error) {
+      this.logger.error(`Error getting driver profile: ${error.message}`, error.stack);
+      throw error;
     }
-
-    return {
-      id: driver.id,
-      user: driver.user,
-      licenseNumber: driver.licenseNumber,
-      licenseExpiryDate: driver.licenseExpiryDate,
-      rating: Number(driver.averageRating),
-      totalTrips: driver.totalTrips,
-      status: driver.status,
-      subscriptionExpiresAt: driver.subscriptionExpiresAt,
-      currentLocation: driver.currentLatitude && driver.currentLongitude ? {
-        latitude: Number(driver.currentLatitude),
-        longitude: Number(driver.currentLongitude),
-      } : null,
-      vehicles: driver.vehicles,
-    };
   }
 }
