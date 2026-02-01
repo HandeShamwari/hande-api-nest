@@ -209,7 +209,7 @@ export class DriversService {
       include: {
         trips: {
           where: {
-            status: { in: ['accepted', 'ongoing'] },
+            status: { in: ['driver_assigned', 'in_progress'] },
           },
         },
       },
@@ -395,12 +395,5 @@ export class DriversService {
       this.logger.error(`Error getting driver profile: ${error.message}`, error.stack);
       throw error;
     }
-  }
-
-  /**
-   * Set realtime gateway (to avoid circular dependency)
-   */
-  setRealtimeGateway(gateway: any) {
-    this.realtimeGateway = gateway;
   }
 }

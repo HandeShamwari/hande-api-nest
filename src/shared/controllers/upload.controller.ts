@@ -24,7 +24,7 @@ export class UploadController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadLicense(
     @CurrentUser('sub') userId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
@@ -63,7 +63,7 @@ export class UploadController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadVehicleImage(
     @CurrentUser('sub') userId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
@@ -102,7 +102,7 @@ export class UploadController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadProfileImage(
     @CurrentUser('sub') userId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');

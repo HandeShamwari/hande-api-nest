@@ -42,7 +42,7 @@ export class SupabaseService {
     const channelName = `driver:${driverId}:location`;
     
     if (this.channels.has(channelName)) {
-      return this.channels.get(channelName);
+      return this.channels.get(channelName)!;
     }
 
     const channel = this.supabase
@@ -89,7 +89,7 @@ export class SupabaseService {
     const channelName = `trip:${tripId}`;
     
     if (this.channels.has(channelName)) {
-      return this.channels.get(channelName);
+      return this.channels.get(channelName)!;
     }
 
     const channel = this.supabase
@@ -132,7 +132,7 @@ export class SupabaseService {
     const channelName = `rider:${riderId}:notifications`;
     
     if (this.channels.has(channelName)) {
-      return this.channels.get(channelName);
+      return this.channels.get(channelName)!;
     }
 
     const channel = this.supabase
@@ -178,7 +178,7 @@ export class SupabaseService {
     const channelName = `driver:${driverId}:notifications`;
     
     if (this.channels.has(channelName)) {
-      return this.channels.get(channelName);
+      return this.channels.get(channelName)!;
     }
 
     const channel = this.supabase

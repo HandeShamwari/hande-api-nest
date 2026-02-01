@@ -401,7 +401,7 @@ export class TripsService {
       });
 
       // Broadcast trip status update
-      if (this.realtimeGateway) {
+      if (this.realtimeGateway && updatedTrip.driver && updatedTrip.rider) {
         try {
           await this.realtimeGateway.broadcastTripStatus(tripId, 'driver_assigned', {
             driverId: driver.id,
@@ -461,13 +461,6 @@ export class TripsService {
 
     if (!driver) {
       throw new BadRequestException('Driver profile not found');
-    // Broadcast trip status
-    if (this.realtimeGateway) {
-      await this.realtimeGateway.broadcastTripStatus(tripId, 'in_progress', {
-        startedAt: updatedTrip.startedAt,
-      });
-    }
-
     }
 
     const trip = await this.prisma.trip.findUnique({
@@ -496,6 +489,13 @@ export class TripsService {
 
     this.logger.log(`Trip ${tripId} started by driver ${driver.id}`);
 
+    // Broadcast trip status
+    if (this.realtimeGateway) {
+      await this.realtimeGateway.broadcastTripStatus(tripId, 'in_progress', {
+        startedAt: updatedTrip.startedAt,
+      });
+    }
+
     return updatedTrip;
   }
 
@@ -513,6 +513,11 @@ export class TripsService {
 
     const trip = await this.prisma.trip.findUnique({
       where: { id: tripId },
+      include: {
+        rider: {
+          include: { user: true },
+        },
+      },
     });
 
     if (!trip) {
@@ -526,23 +531,7 @@ export class TripsService {
     if (trip.status !== 'in_progress') {
       throw new BadRequestException('Trip is not in progress');
     }
-// Broadcast trip completion
-    if (this.realtimeGateway) {
-      await this.realtimeGateway.broadcastTripStatus(tripId, 'completed', {
-        completedAt: updatedTrip.completedAt,
-        finalFare: updatedTrip.finalFare,
-      });
 
-      // Notify rider
-      await this.realtimeGateway.notifyUser(updatedTrip.rider.userId, 'rider', {
-        type: 'trip_completed',
-        title: 'Trip Completed',
-        message: 'Your trip has been completed. Please rate your driver.',
-        data: { tripId, finalFare: updatedTrip.finalFare },
-      });
-    }
-
-    
     const updatedTrip = await this.prisma.trip.update({
       where: { id: tripId },
       data: {
@@ -565,6 +554,22 @@ export class TripsService {
     });
 
     this.logger.log(`Trip ${tripId} completed by driver ${driver.id}`);
+
+    // Broadcast trip completion
+    if (this.realtimeGateway && updatedTrip.rider) {
+      await this.realtimeGateway.broadcastTripStatus(tripId, 'completed', {
+        completedAt: updatedTrip.completedAt,
+        finalFare: updatedTrip.finalFare,
+      });
+
+      // Notify rider
+      await this.realtimeGateway.notifyUser(updatedTrip.rider.userId, 'rider', {
+        type: 'trip_completed',
+        title: 'Trip Completed',
+        message: 'Your trip has been completed. Please rate your driver.',
+        data: { tripId, finalFare: updatedTrip.finalFare },
+      });
+    }
 
     return updatedTrip;
   }
