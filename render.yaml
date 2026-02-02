@@ -2,13 +2,13 @@ services:
   - type: web
     name: hande-api
     runtime: node
-    buildCommand: npm install && npx prisma generate && npm run build
-    startCommand: npm run start:prod
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: node dist/main.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 3000
+        value: 10000
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
