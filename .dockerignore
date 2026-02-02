@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+.git
+.gitignore
+*.log
+npm-debug.log*
+README.md
+.vscode
+.idea
+coverage
+.nyc_output
