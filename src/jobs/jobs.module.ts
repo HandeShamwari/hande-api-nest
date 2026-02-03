@@ -32,6 +32,7 @@ import { SharedModule } from '../shared/shared.module';
             username: url.username || 'default',
             password: url.password,
             maxRetriesPerRequest: null, // Required for Bull blocking operations
+            enableReadyCheck: false, // Required for Bull subscriber/bclient
             enableOfflineQueue: true,
             connectTimeout: 10000,
             ...(isSecure && {
@@ -57,6 +58,7 @@ import { SharedModule } from '../shared/shared.module';
           port: configService.get('REDIS_PORT', 6379),
           password: configService.get('REDIS_PASSWORD'),
           maxRetriesPerRequest: null,
+          enableReadyCheck: false,
           enableOfflineQueue: true,
           ...(redisTls && {
             tls: {
