@@ -13,11 +13,21 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { TripsService } from '../services/trips.service';
 import { CreateTripDto } from '../dto/create-trip.dto';
 import { UpdateTripStatusDto } from '../dto/update-trip-status.dto';
+import { FareEstimateRequestDto } from '../dto/fare-estimate.dto';
 
 @Controller('trips')
 @UseGuards(JwtAuthGuard)
 export class TripsController {
   constructor(private readonly tripsService: TripsService) {}
+
+  /**
+   * Get fare estimate for a trip
+   * POST /api/trips/estimate
+   */
+  @Post('estimate')
+  async estimateFare(@Body() dto: FareEstimateRequestDto) {
+    return this.tripsService.estimateFare(dto);
+  }
 
   /**
    * Rider: Create new trip request
@@ -32,6 +42,33 @@ export class TripsController {
   }
 
   /**
+   * Driver: Get nearby pending trips
+   * GET /api/trips/nearby/available
+   */
+  @Get('nearby/available')
+  async getNearbyTrips(@CurrentUser('sub') userId: string) {
+    return this.tripsService.getNearbyTrips(userId);
+  }
+
+  /**
+   * Get rider's trip history
+   * GET /api/trips/rider/history
+   */
+  @Get('rider/history')
+  async getRiderTrips(@CurrentUser('sub') userId: string) {
+    return this.tripsService.getRiderTrips(userId);
+  }
+
+  /**
+   * Get driver's trip history
+   * GET /api/trips/driver/history
+   */
+  @Get('driver/history')
+  async getDriverTrips(@CurrentUser('sub') userId: string) {
+    return this.tripsService.getDriverTrips(userId);
+  }
+
+  /**
    * Get trip details by ID
    * GET /api/trips/:id
    */
@@ -41,15 +78,6 @@ export class TripsController {
     @CurrentUser('sub') userId: string,
   ) {
     return this.tripsService.getTripById(tripId, userId);
-  }
-
-  /**
-   * Driver: Get nearby pending trips
-   * GET /api/trips/nearby
-   */
-  @Get('nearby/available')
-  async getNearbyTrips(@CurrentUser('sub') userId: string) {
-    return this.tripsService.getNearbyTrips(userId);
   }
 
   /**
@@ -75,23 +103,5 @@ export class TripsController {
     @Body() dto: UpdateTripStatusDto,
   ) {
     return this.tripsService.updateTripStatus(tripId, userId, dto);
-  }
-
-  /**
-   * Get rider's trip history
-   * GET /api/trips/rider/history
-   */
-  @Get('rider/history')
-  async getRiderTrips(@CurrentUser('sub') userId: string) {
-    return this.tripsService.getRiderTrips(userId);
-  }
-
-  /**
-   * Get driver's trip history
-   * GET /api/trips/driver/history
-   */
-  @Get('driver/history')
-  async getDriverTrips(@CurrentUser('sub') userId: string) {
-    return this.tripsService.getDriverTrips(userId);
   }
 }

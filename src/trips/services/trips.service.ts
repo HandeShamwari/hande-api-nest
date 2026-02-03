@@ -10,6 +10,7 @@ import {
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CreateTripDto } from '../dto/create-trip.dto';
 import { CancelTripDto } from '../dto/cancel-trip.dto';
+import { FareEstimateRequestDto, FareEstimateResponseDto, FARE_CONFIG } from '../dto/fare-estimate.dto';
 import { JobsService } from '../../jobs/services/jobs.service';
 
 @Injectable()
@@ -60,6 +61,95 @@ export class TripsService {
 
   private toRad(degrees: number): number {
     return degrees * (Math.PI / 180);
+  }
+
+  /**
+   * Estimate duration based on distance (avg 30 km/h in city)
+   */
+  private estimateDuration(distanceKm: number): number {
+    const avgSpeedKmh = 30;
+    return Math.ceil((distanceKm / avgSpeedKmh) * 60); // minutes
+  }
+
+  /**
+   * Get fare estimate for a trip (public endpoint)
+   */
+  async estimateFare(dto: FareEstimateRequestDto): Promise<FareEstimateResponseDto> {
+    // Calculate distance
+    const distance = this.calculateDistance(
+      dto.pickup.latitude,
+      dto.pickup.longitude,
+      dto.dropoff.latitude,
+      dto.dropoff.longitude,
+    );
+
+    // Add stops distance if any
+    let totalDistance = distance;
+    if (dto.stops && dto.stops.length > 0) {
+      let prevLat = dto.pickup.latitude;
+      let prevLng = dto.pickup.longitude;
+      
+      for (const stop of dto.stops) {
+        totalDistance += this.calculateDistance(prevLat, prevLng, stop.latitude, stop.longitude);
+        prevLat = stop.latitude;
+        prevLng = stop.longitude;
+      }
+      
+      // Add distance from last stop to dropoff
+      totalDistance += this.calculateDistance(prevLat, prevLng, dto.dropoff.latitude, dto.dropoff.longitude);
+      // Subtract original direct distance since we recalculated
+      totalDistance -= distance;
+    }
+
+    // Estimate duration
+    const duration = this.estimateDuration(totalDistance);
+
+    // Calculate fare components
+    const vehicleType = dto.vehicleType || 'sedan';
+    const multiplier = FARE_CONFIG.vehicleMultipliers[vehicleType] || 1.0;
+
+    const baseFare = FARE_CONFIG.baseFare;
+    const distanceCharge = totalDistance * FARE_CONFIG.perKmRate;
+    const timeCharge = duration * FARE_CONFIG.perMinRate;
+    
+    let subtotal = (baseFare + distanceCharge + timeCharge) * multiplier;
+    
+    // Apply minimum fare
+    subtotal = Math.max(subtotal, FARE_CONFIG.minFare);
+    
+    // Add booking fee
+    const total = subtotal + FARE_CONFIG.bookingFee;
+
+    // Round to 2 decimal places
+    const roundedTotal = Math.round(total * 100) / 100;
+
+    this.logger.debug(
+      `Fare estimate: ${totalDistance.toFixed(2)}km, ${duration}min, $${roundedTotal}`,
+    );
+
+    return {
+      estimatedFare: roundedTotal,
+      currency: 'USD',
+      distance: Math.round(totalDistance * 100) / 100,
+      duration,
+      breakdown: {
+        baseFare: Math.round(baseFare * 100) / 100,
+        distanceCharge: Math.round(distanceCharge * multiplier * 100) / 100,
+        timeCharge: Math.round(timeCharge * multiplier * 100) / 100,
+        total: roundedTotal,
+      },
+      vehicleType,
+      pickup: {
+        address: dto.pickup.address || 'Pickup location',
+        latitude: dto.pickup.latitude,
+        longitude: dto.pickup.longitude,
+      },
+      dropoff: {
+        address: dto.dropoff.address || 'Dropoff location',
+        latitude: dto.dropoff.latitude,
+        longitude: dto.dropoff.longitude,
+      },
+    };
   }
 
   /**

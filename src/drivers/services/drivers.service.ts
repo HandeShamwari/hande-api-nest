@@ -7,6 +7,10 @@ import {
   UpdateDriverProfileDto,
   UpdateDriverLocationDto,
   DriverStatsResponseDto,
+  GoOnlineDto,
+  GoOfflineDto,
+  PayDailyFeeDto,
+  DailyFeeHistoryQueryDto,
 } from '../dto/driver.dto';
 import { JobsService } from '../../jobs/services/jobs.service';
 
@@ -15,6 +19,7 @@ export class DriversService {
   private readonly logger = new Logger(DriversService.name);
   private readonly dailyFeeAmount: number;
   private readonly graceHours: number;
+  private readonly penaltyAmount: number;
   private realtimeGateway: any; // Lazy loaded
 
   constructor(
@@ -26,6 +31,7 @@ export class DriversService {
   ) {
     this.dailyFeeAmount = parseFloat(this.config.get('DAILY_FEE_AMOUNT', '1.00'));
     this.graceHours = parseInt(this.config.get('DAILY_FEE_GRACE_HOURS', '6'));
+    this.penaltyAmount = parseFloat(this.config.get('DAILY_FEE_PENALTY', '0.50'));
   }
 
   /**
@@ -33,6 +39,487 @@ export class DriversService {
    */
   setRealtimeGateway(gateway: any) {
     this.realtimeGateway = gateway;
+  }
+
+  // ============================================================================
+  // STATUS MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Get current driver status
+   */
+  async getCurrentStatus(userId: string) {
+    const driver = await this.prisma.driver.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: { firstName: true, lastName: true },
+        },
+        trips: {
+          where: {
+            status: { in: ['driver_assigned', 'driver_en_route', 'driver_arrived', 'in_progress'] },
+          },
+          take: 1,
+        },
+      },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Driver profile not found');
+    }
+
+    const now = new Date();
+    const isSubscriptionActive = driver.subscriptionExpiresAt && driver.subscriptionExpiresAt > now;
+    const isInGracePeriod = !isSubscriptionActive && driver.subscriptionExpiresAt && 
+      new Date(driver.subscriptionExpiresAt.getTime() + this.graceHours * 60 * 60 * 1000) > now;
+
+    return {
+      driverId: driver.id,
+      status: driver.status,
+      isOnline: driver.status === 'available',
+      isOnTrip: driver.status === 'on_trip',
+      activeTrip: driver.trips[0] || null,
+      canAcceptRides: (isSubscriptionActive || isInGracePeriod) && driver.status === 'available',
+      subscriptionActive: isSubscriptionActive,
+      subscriptionExpiresAt: driver.subscriptionExpiresAt,
+      currentLocation: driver.currentLatitude && driver.currentLongitude ? {
+        latitude: Number(driver.currentLatitude),
+        longitude: Number(driver.currentLongitude),
+        lastUpdate: driver.lastLocationUpdate,
+      } : null,
+    };
+  }
+
+  /**
+   * Go online to accept ride requests
+   */
+  async goOnline(userId: string, dto: GoOnlineDto) {
+    const driver = await this.prisma.driver.findUnique({
+      where: { userId },
+      include: {
+        vehicles: {
+          where: { isActive: true, status: 'approved' },
+        },
+      },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Driver profile not found');
+    }
+
+    // Check subscription status
+    const now = new Date();
+    const isSubscriptionActive = driver.subscriptionExpiresAt && driver.subscriptionExpiresAt > now;
+    const isInGracePeriod = !isSubscriptionActive && driver.subscriptionExpiresAt && 
+      new Date(driver.subscriptionExpiresAt.getTime() + this.graceHours * 60 * 60 * 1000) > now;
+
+    if (!isSubscriptionActive && !isInGracePeriod) {
+      throw new BadRequestException('Your subscription has expired. Please subscribe to go online.');
+    }
+
+    // Check if driver has an active approved vehicle
+    if (driver.vehicles.length === 0) {
+      throw new BadRequestException('You need at least one approved active vehicle to go online.');
+    }
+
+    // Check if already online
+    if (driver.status === 'available') {
+      return {
+        message: 'You are already online',
+        status: 'available',
+      };
+    }
+
+    // Check if on trip (can't go offline manually)
+    if (driver.status === 'on_trip') {
+      throw new BadRequestException('Cannot change status while on an active trip');
+    }
+
+    // Update driver status and location if provided
+    const updateData: any = {
+      status: 'available',
+    };
+
+    if (dto.latitude && dto.longitude) {
+      updateData.currentLatitude = dto.latitude;
+      updateData.currentLongitude = dto.longitude;
+      updateData.lastLocationUpdate = now;
+    }
+
+    await this.prisma.driver.update({
+      where: { id: driver.id },
+      data: updateData,
+    });
+
+    // Broadcast status change via Supabase
+    try {
+      await this.supabase.broadcastDriverStatus(driver.id, 'available');
+    } catch (error) {
+      this.logger.warn(`Failed to broadcast status: ${error.message}`);
+    }
+
+    return {
+      message: 'You are now online and can receive ride requests',
+      status: 'available',
+      subscriptionWarning: isInGracePeriod ? 'Your subscription has expired. You are in grace period.' : null,
+    };
+  }
+
+  /**
+   * Go offline to stop accepting rides
+   */
+  async goOffline(userId: string, dto: GoOfflineDto) {
+    const driver = await this.prisma.driver.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Driver profile not found');
+    }
+
+    // Check if on trip
+    if (driver.status === 'on_trip') {
+      throw new BadRequestException('Cannot go offline while on an active trip. Please complete the trip first.');
+    }
+
+    // Check if already offline
+    if (driver.status === 'off_duty') {
+      return {
+        message: 'You are already offline',
+        status: 'off_duty',
+      };
+    }
+
+    await this.prisma.driver.update({
+      where: { id: driver.id },
+      data: { status: 'off_duty' },
+    });
+
+    // Broadcast status change
+    try {
+      await this.supabase.broadcastDriverStatus(driver.id, 'off_duty');
+    } catch (error) {
+      this.logger.warn(`Failed to broadcast status: ${error.message}`);
+    }
+
+    return {
+      message: 'You are now offline',
+      status: 'off_duty',
+      reason: dto.reason || 'User requested',
+    };
+  }
+
+  // ============================================================================
+  // DAILY FEE MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Get daily fee status
+   */
+  async getDailyFeeStatus(userId: string) {
+    const driver = await this.prisma.driver.findUnique({
+      where: { userId },
+      include: {
+        dailyFees: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Driver profile not found');
+    }
+
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+
+    // Check for today's fee
+    const todayFee = await this.prisma.dailyFee.findFirst({
+      where: {
+        driverId: driver.id,
+        feeDate: {
+          gte: todayStart,
+        },
+      },
+    });
+
+    // Calculate status
+    const isSubscriptionActive = driver.subscriptionExpiresAt && driver.subscriptionExpiresAt > now;
+    const isInGracePeriod = !isSubscriptionActive && driver.subscriptionExpiresAt && 
+      new Date(driver.subscriptionExpiresAt.getTime() + this.graceHours * 60 * 60 * 1000) > now;
+
+    let status: 'paid' | 'pending' | 'grace_period' | 'overdue' = 'pending';
+    let canAcceptRides = false;
+
+    if (todayFee?.status === 'paid') {
+      status = 'paid';
+      canAcceptRides = true;
+    } else if (isInGracePeriod) {
+      status = 'grace_period';
+      canAcceptRides = true;
+    } else if (!isSubscriptionActive && !isInGracePeriod) {
+      status = 'overdue';
+      canAcceptRides = false;
+    }
+
+    // Calculate unpaid days
+    const unpaidFees = await this.prisma.dailyFee.count({
+      where: {
+        driverId: driver.id,
+        status: { in: ['pending', 'overdue', 'grace_period'] },
+      },
+    });
+
+    // Calculate penalty if overdue
+    const penaltyAmount = status === 'overdue' ? unpaidFees * this.penaltyAmount : 0;
+
+    return {
+      status,
+      todayPaid: todayFee?.status === 'paid',
+      canAcceptRides,
+      dailyFeeAmount: this.dailyFeeAmount,
+      unpaidDays: unpaidFees,
+      totalOwed: unpaidFees * this.dailyFeeAmount + penaltyAmount,
+      penaltyAmount,
+      subscriptionExpiresAt: driver.subscriptionExpiresAt,
+      graceHours: this.graceHours,
+      lastPayment: driver.dailyFees[0] || null,
+    };
+  }
+
+  /**
+   * Pay daily fee
+   */
+  async payDailyFee(userId: string, dto: PayDailyFeeDto) {
+    const driver = await this.prisma.driver.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Driver profile not found');
+    }
+
+    const days = dto.days || 1;
+    const now = new Date();
+    const totalAmount = days * this.dailyFeeAmount;
+
+    // Check wallet balance (simulated - in production, integrate with payment gateway)
+    if (Number(driver.walletBalance) < totalAmount) {
+      throw new BadRequestException(
+        `Insufficient wallet balance. Required: $${totalAmount.toFixed(2)}, Available: $${Number(driver.walletBalance).toFixed(2)}`
+      );
+    }
+
+    // Create subscription payments for each day
+    const subscriptions: Array<{ id: string; amount: any; expiresAt: Date | null }> = [];
+    let currentExpiry = driver.subscriptionExpiresAt && driver.subscriptionExpiresAt > now 
+      ? new Date(driver.subscriptionExpiresAt) 
+      : now;
+
+    for (let i = 0; i < days; i++) {
+      const expiresAt = new Date(currentExpiry.getTime() + 24 * 60 * 60 * 1000);
+      
+      const fee = await this.prisma.dailyFee.create({
+        data: {
+          driverId: driver.id,
+          amount: this.dailyFeeAmount,
+          feeDate: new Date(currentExpiry),
+          paidAt: now,
+          expiresAt,
+          status: 'paid',
+          paymentMethodId: dto.paymentMethodId,
+        },
+      });
+      
+      subscriptions.push(fee);
+      currentExpiry = expiresAt;
+    }
+
+    // Update driver
+    const newWalletBalance = Number(driver.walletBalance) - totalAmount;
+    await this.prisma.driver.update({
+      where: { id: driver.id },
+      data: {
+        walletBalance: newWalletBalance,
+        subscriptionExpiresAt: currentExpiry,
+        status: driver.status === 'suspended' ? 'off_duty' : driver.status,
+        dailyFeeStatus: 'paid',
+        dailyFeePaidAt: now,
+      },
+    });
+
+    // Schedule expiry warning
+    try {
+      await this.jobsService.scheduleExpiryWarning(driver.id, currentExpiry);
+    } catch (error) {
+      this.logger.warn(`Failed to schedule expiry warning: ${error.message}`);
+    }
+
+    return {
+      message: `Successfully paid for ${days} day(s)`,
+      totalPaid: totalAmount,
+      newWalletBalance,
+      subscriptionExpiresAt: currentExpiry,
+      subscriptions: subscriptions.map(s => ({
+        id: s.id,
+        amount: s.amount,
+        expiresAt: s.expiresAt,
+      })),
+    };
+  }
+
+  /**
+   * Get daily fee payment history
+   */
+  async getDailyFeeHistory(userId: string, query: DailyFeeHistoryQueryDto) {
+    const driver = await this.prisma.driver.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Driver profile not found');
+    }
+
+    const where: any = { driverId: driver.id };
+
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    if (query.startDate || query.endDate) {
+      where.feeDate = {};
+      if (query.startDate) {
+        where.feeDate.gte = new Date(query.startDate);
+      }
+      if (query.endDate) {
+        where.feeDate.lte = new Date(query.endDate);
+      }
+    }
+
+    const fees = await this.prisma.dailyFee.findMany({
+      where,
+      orderBy: { feeDate: 'desc' },
+      take: 100,
+    });
+
+    // Calculate summary
+    const totalPaid = fees
+      .filter(f => f.status === 'paid')
+      .reduce((sum, f) => sum + Number(f.amount), 0);
+
+    return {
+      history: fees.map(f => ({
+        id: f.id,
+        amount: Number(f.amount),
+        penaltyAmount: Number(f.penaltyAmount),
+        totalAmount: Number(f.totalAmount),
+        status: f.status,
+        feeDate: f.feeDate,
+        paidAt: f.paidAt,
+        expiresAt: f.expiresAt,
+      })),
+      summary: {
+        totalRecords: fees.length,
+        totalPaid,
+        totalPending: fees.filter(f => f.status === 'pending').length,
+        totalOverdue: fees.filter(f => f.status === 'overdue').length,
+      },
+    };
+  }
+
+  // ============================================================================
+  // EARNINGS
+  // ============================================================================
+
+  /**
+   * Get detailed earnings breakdown
+   */
+  async getEarnings(userId: string, period?: 'today' | 'week' | 'month' | 'all') {
+    const driver = await this.prisma.driver.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Driver profile not found');
+    }
+
+    const now = new Date();
+    let startDate: Date;
+
+    switch (period) {
+      case 'today':
+        startDate = new Date(now.setHours(0, 0, 0, 0));
+        break;
+      case 'week':
+        startDate = new Date(now);
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case 'month':
+        startDate = new Date(now);
+        startDate.setMonth(startDate.getMonth() - 1);
+        break;
+      default:
+        startDate = new Date(0); // All time
+    }
+
+    // Get completed trips in period
+    const trips = await this.prisma.trip.findMany({
+      where: {
+        driverId: driver.id,
+        status: 'completed',
+        completedAt: { gte: startDate },
+      },
+      orderBy: { completedAt: 'desc' },
+    });
+
+    // Get daily fees paid in period
+    const feesPaid = await this.prisma.dailyFee.findMany({
+      where: {
+        driverId: driver.id,
+        status: 'paid',
+        paidAt: { gte: startDate },
+      },
+    });
+
+    // Calculate earnings
+    const grossEarnings = trips.reduce((sum, t) => sum + (Number(t.finalFare) || 0), 0);
+    const totalFees = feesPaid.reduce((sum, f) => sum + Number(f.amount), 0);
+    const netEarnings = grossEarnings - totalFees;
+
+    // Group by day for chart data
+    const dailyEarnings: { date: string; earnings: number; trips: number }[] = [];
+    const tripsByDay = new Map<string, { earnings: number; count: number }>();
+
+    trips.forEach(trip => {
+      if (trip.completedAt) {
+        const dateStr = trip.completedAt.toISOString().split('T')[0];
+        const existing = tripsByDay.get(dateStr) || { earnings: 0, count: 0 };
+        existing.earnings += Number(trip.finalFare) || 0;
+        existing.count += 1;
+        tripsByDay.set(dateStr, existing);
+      }
+    });
+
+    tripsByDay.forEach((value, date) => {
+      dailyEarnings.push({
+        date,
+        earnings: value.earnings,
+        trips: value.count,
+      });
+    });
+
+    return {
+      period: period || 'all',
+      grossEarnings,
+      totalFees,
+      netEarnings,
+      tripCount: trips.length,
+      averagePerTrip: trips.length > 0 ? grossEarnings / trips.length : 0,
+      walletBalance: Number(driver.walletBalance),
+      dailyEarnings: dailyEarnings.sort((a, b) => a.date.localeCompare(b.date)),
+    };
   }
 
   /**

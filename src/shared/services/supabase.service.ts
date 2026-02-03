@@ -83,6 +83,27 @@ export class SupabaseService {
   }
 
   /**
+   * Broadcast driver status update (online/offline)
+   */
+  async broadcastDriverStatus(driverId: string, status: string) {
+    if (!this.supabase) return;
+    
+    const channel = this.supabase.channel(`driver:${driverId}:status`);
+    
+    await channel.send({
+      type: 'broadcast',
+      event: 'status',
+      payload: {
+        driverId,
+        status,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    this.logger.debug(`Broadcasted status for driver ${driverId}: ${status}`);
+  }
+
+  /**
    * Subscribe to trip updates
    */
   subscribeToTrip(tripId: string, callback: (data: any) => void): RealtimeChannel {
