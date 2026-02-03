@@ -30,8 +30,10 @@ import { SharedModule } from '../shared/shared.module';
               port: parseInt(url.port) || 6379,
               username: url.username || 'default',
               password: url.password,
-              maxRetriesPerRequest: 3,
-              enableOfflineQueue: false,
+              maxRetriesPerRequest: null, // Required for Bull to work with Upstash
+              enableOfflineQueue: true, // Queue commands while connecting
+              connectTimeout: 10000, // 10s for TLS handshake
+              retryDelayOnFailover: 100,
               ...(isSecure && {
                 tls: {
                   rejectUnauthorized: false,
@@ -48,8 +50,8 @@ import { SharedModule } from '../shared/shared.module';
             host: configService.get('REDIS_HOST', 'localhost'),
             port: configService.get('REDIS_PORT', 6379),
             password: configService.get('REDIS_PASSWORD'),
-            maxRetriesPerRequest: 3,
-            enableOfflineQueue: false,
+            maxRetriesPerRequest: null,
+            enableOfflineQueue: true,
             ...(redisTls && {
               tls: {
                 rejectUnauthorized: false,
