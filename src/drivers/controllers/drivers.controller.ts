@@ -20,6 +20,7 @@ import {
   GoOfflineDto,
   PayDailyFeeDto,
   DailyFeeHistoryQueryDto,
+  StartShiftDto,
 } from '../dto/driver.dto';
 
 @Controller('drivers')
@@ -195,5 +196,53 @@ export class DriversController {
     @Query('period') period?: 'today' | 'week' | 'month' | 'all',
   ) {
     return this.driversService.getEarnings(userId, period);
+  }
+
+  // ============================================================================
+  // SHIFT MANAGEMENT ENDPOINTS
+  // ============================================================================
+
+  /**
+   * POST /api/drivers/shift/start
+   * Start a new driving shift
+   */
+  @Post('shift/start')
+  @HttpCode(HttpStatus.OK)
+  async startShift(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: StartShiftDto,
+  ) {
+    return this.driversService.startShift(userId, dto.latitude, dto.longitude);
+  }
+
+  /**
+   * POST /api/drivers/shift/end
+   * End current driving shift
+   */
+  @Post('shift/end')
+  @HttpCode(HttpStatus.OK)
+  async endShift(@CurrentUser('sub') userId: string) {
+    return this.driversService.endShift(userId);
+  }
+
+  /**
+   * GET /api/drivers/shift/current
+   * Get current active shift (if any)
+   */
+  @Get('shift/current')
+  async getCurrentShift(@CurrentUser('sub') userId: string) {
+    return this.driversService.getCurrentShift(userId);
+  }
+
+  /**
+   * GET /api/drivers/shift/history
+   * Get shift history
+   */
+  @Get('shift/history')
+  async getShiftHistory(
+    @CurrentUser('sub') userId: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.driversService.getShiftHistory(userId, limit || 20);
   }
 }

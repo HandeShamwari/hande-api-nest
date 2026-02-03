@@ -1,6 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
-import { UpdateRiderProfileDto, RiderStatsResponseDto } from '../dto/rider.dto';
+import { 
+  UpdateRiderProfileDto, 
+  RiderStatsResponseDto,
+  CreateSavedLocationDto,
+  UpdateSavedLocationDto,
+  CreateEmergencyContactDto,
+  UpdateEmergencyContactDto,
+  UpdateRiderLocationDto,
+} from '../dto/rider.dto';
 
 @Injectable()
 export class RidersService {
@@ -156,5 +164,289 @@ export class RidersService {
         rating: Number(trip.driver.averageRating),
       } : null,
     }));
+  }
+
+  // ============================================================================
+  // SAVED LOCATIONS
+  // ============================================================================
+
+  /**
+   * Get all saved locations
+   */
+  async getSavedLocations(userId: string) {
+    const rider = await this.prisma.rider.findUnique({
+      where: { userId },
+    });
+
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    return this.prisma.favoriteLocation.findMany({
+      where: { riderId: rider.id },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Create saved location
+   */
+  async createSavedLocation(userId: string, dto: CreateSavedLocationDto) {
+    const rider = await this.prisma.rider.findUnique({
+      where: { userId },
+    });
+
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    // Limit to 10 saved locations
+    const count = await this.prisma.favoriteLocation.count({
+      where: { riderId: rider.id },
+    });
+
+    if (count >= 10) {
+      throw new BadRequestException('Maximum 10 saved locations allowed');
+    }
+
+    return this.prisma.favoriteLocation.create({
+      data: {
+        riderId: rider.id,
+        name: dto.name,
+        address: dto.address,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        type: dto.type || 'other',
+      },
+    });
+  }
+
+  /**
+   * Update saved location
+   */
+  async updateSavedLocation(userId: string, locationId: string, dto: UpdateSavedLocationDto) {
+    const rider = await this.prisma.rider.findUnique({
+      where: { userId },
+    });
+
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    const location = await this.prisma.favoriteLocation.findFirst({
+      where: { id: locationId, riderId: rider.id },
+    });
+
+    if (!location) {
+      throw new NotFoundException('Saved location not found');
+    }
+
+    return this.prisma.favoriteLocation.update({
+      where: { id: locationId },
+      data: {
+        ...(dto.name && { name: dto.name }),
+        ...(dto.address && { address: dto.address }),
+        ...(dto.latitude && { latitude: dto.latitude }),
+        ...(dto.longitude && { longitude: dto.longitude }),
+        ...(dto.type && { type: dto.type }),
+      },
+    });
+  }
+
+  /**
+   * Delete saved location
+   */
+  async deleteSavedLocation(userId: string, locationId: string) {
+    const rider = await this.prisma.rider.findUnique({
+      where: { userId },
+    });
+
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    const location = await this.prisma.favoriteLocation.findFirst({
+      where: { id: locationId, riderId: rider.id },
+    });
+
+    if (!location) {
+      throw new NotFoundException('Saved location not found');
+    }
+
+    await this.prisma.favoriteLocation.delete({
+      where: { id: locationId },
+    });
+
+    return { success: true, message: 'Location deleted' };
+  }
+
+  // ============================================================================
+  // EMERGENCY CONTACTS
+  // ============================================================================
+
+  /**
+   * Get all emergency contacts
+   */
+  async getEmergencyContacts(userId: string) {
+    const rider = await this.prisma.rider.findUnique({
+      where: { userId },
+    });
+
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    return this.prisma.emergencyContact.findMany({
+      where: { riderId: rider.id },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  /**
+   * Create emergency contact
+   */
+  async createEmergencyContact(userId: string, dto: CreateEmergencyContactDto) {
+    const rider = await this.prisma.rider.findUnique({
+      where: { userId },
+    });
+
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    // Limit to 5 emergency contacts
+    const count = await this.prisma.emergencyContact.count({
+      where: { riderId: rider.id },
+    });
+
+    if (count >= 5) {
+      throw new BadRequestException('Maximum 5 emergency contacts allowed');
+    }
+
+    // If setting as primary, unset other primaries
+    if (dto.isPrimary) {
+      await this.prisma.emergencyContact.updateMany({
+        where: { riderId: rider.id },
+        data: { isPrimary: false },
+      });
+    }
+
+    // First contact is automatically primary
+    const isPrimary = count === 0 ? true : dto.isPrimary || false;
+
+    return this.prisma.emergencyContact.create({
+      data: {
+        riderId: rider.id,
+        name: dto.name,
+        phone: dto.phone,
+        relationship: dto.relationship,
+        isPrimary,
+      },
+    });
+  }
+
+  /**
+   * Update emergency contact
+   */
+  async updateEmergencyContact(userId: string, contactId: string, dto: UpdateEmergencyContactDto) {
+    const rider = await this.prisma.rider.findUnique({
+      where: { userId },
+    });
+
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    const contact = await this.prisma.emergencyContact.findFirst({
+      where: { id: contactId, riderId: rider.id },
+    });
+
+    if (!contact) {
+      throw new NotFoundException('Emergency contact not found');
+    }
+
+    // If setting as primary, unset other primaries
+    if (dto.isPrimary) {
+      await this.prisma.emergencyContact.updateMany({
+        where: { riderId: rider.id, id: { not: contactId } },
+        data: { isPrimary: false },
+      });
+    }
+
+    return this.prisma.emergencyContact.update({
+      where: { id: contactId },
+      data: {
+        ...(dto.name && { name: dto.name }),
+        ...(dto.phone && { phone: dto.phone }),
+        ...(dto.relationship !== undefined && { relationship: dto.relationship }),
+        ...(dto.isPrimary !== undefined && { isPrimary: dto.isPrimary }),
+      },
+    });
+  }
+
+  /**
+   * Delete emergency contact
+   */
+  async deleteEmergencyContact(userId: string, contactId: string) {
+    const rider = await this.prisma.rider.findUnique({
+      where: { userId },
+    });
+
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    const contact = await this.prisma.emergencyContact.findFirst({
+      where: { id: contactId, riderId: rider.id },
+    });
+
+    if (!contact) {
+      throw new NotFoundException('Emergency contact not found');
+    }
+
+    await this.prisma.emergencyContact.delete({
+      where: { id: contactId },
+    });
+
+    // If deleted contact was primary, set another as primary
+    if (contact.isPrimary) {
+      const remaining = await this.prisma.emergencyContact.findFirst({
+        where: { riderId: rider.id },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      if (remaining) {
+        await this.prisma.emergencyContact.update({
+          where: { id: remaining.id },
+          data: { isPrimary: true },
+        });
+      }
+    }
+
+    return { success: true, message: 'Contact deleted' };
+  }
+
+  /**
+   * Update rider location
+   */
+  async updateLocation(userId: string, dto: UpdateRiderLocationDto) {
+    const rider = await this.prisma.rider.findUnique({
+      where: { userId },
+    });
+
+    if (!rider) {
+      throw new NotFoundException('Rider profile not found');
+    }
+
+    await this.prisma.rider.update({
+      where: { id: rider.id },
+      data: {
+        currentLatitude: dto.latitude,
+        currentLongitude: dto.longitude,
+        lastLocationUpdate: new Date(),
+      },
+    });
+
+    return { success: true };
   }
 }

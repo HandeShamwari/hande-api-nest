@@ -894,4 +894,231 @@ export class DriversService {
       throw error;
     }
   }
+
+  // ============================================================================
+  // SHIFT MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Start a new shift
+   */
+  async startShift(userId: string, latitude?: number, longitude?: number) {
+    const driver = await this.prisma.driver.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Driver profile not found');
+    }
+
+    // Check for active shift
+    const activeShift = await this.prisma.driverShift.findFirst({
+      where: {
+        driverId: driver.id,
+        endTime: null,
+      },
+    });
+
+    if (activeShift) {
+      throw new BadRequestException('You already have an active shift');
+    }
+
+    // Check subscription
+    if (driver.dailyFeeStatus !== 'paid') {
+      throw new BadRequestException('Active subscription required to start a shift');
+    }
+
+    // Create shift
+    const shift = await this.prisma.driverShift.create({
+      data: {
+        driverId: driver.id,
+        startTime: new Date(),
+        tripCount: 0,
+        earnings: 0,
+      },
+    });
+
+    // Update driver status
+    await this.prisma.driver.update({
+      where: { id: driver.id },
+      data: {
+        status: 'available',
+        ...(latitude && { currentLatitude: latitude }),
+        ...(longitude && { currentLongitude: longitude }),
+        lastLocationUpdate: new Date(),
+      },
+    });
+
+    this.logger.log(`Shift started: ${shift.id} for driver ${driver.id}`);
+
+    return {
+      id: shift.id,
+      startTime: shift.startTime,
+      isActive: true,
+      message: 'Shift started successfully',
+    };
+  }
+
+  /**
+   * End current shift
+   */
+  async endShift(userId: string) {
+    const driver = await this.prisma.driver.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Driver profile not found');
+    }
+
+    const activeShift = await this.prisma.driverShift.findFirst({
+      where: {
+        driverId: driver.id,
+        endTime: null,
+      },
+    });
+
+    if (!activeShift) {
+      throw new BadRequestException('No active shift found');
+    }
+
+    const endTime = new Date();
+    const durationMinutes = Math.floor(
+      (endTime.getTime() - activeShift.startTime.getTime()) / 60000
+    );
+
+    // Calculate shift earnings
+    const shiftTrips = await this.prisma.trip.findMany({
+      where: {
+        driverId: driver.id,
+        status: 'completed',
+        completedAt: {
+          gte: activeShift.startTime,
+          lte: endTime,
+        },
+      },
+    });
+
+    const earnings = shiftTrips.reduce(
+      (sum, trip) => sum + (trip.finalFare ? Number(trip.finalFare) : 0),
+      0
+    );
+
+    // Update shift
+    const updatedShift = await this.prisma.driverShift.update({
+      where: { id: activeShift.id },
+      data: {
+        endTime,
+        duration: durationMinutes,
+        tripCount: shiftTrips.length,
+        earnings,
+      },
+    });
+
+    // Update driver status
+    await this.prisma.driver.update({
+      where: { id: driver.id },
+      data: { status: 'off_duty' },
+    });
+
+    this.logger.log(`Shift ended: ${activeShift.id} for driver ${driver.id}`);
+
+    return {
+      id: updatedShift.id,
+      startTime: updatedShift.startTime,
+      endTime: updatedShift.endTime,
+      duration: durationMinutes,
+      tripCount: shiftTrips.length,
+      earnings,
+      message: 'Shift ended successfully',
+    };
+  }
+
+  /**
+   * Get current shift
+   */
+  async getCurrentShift(userId: string) {
+    const driver = await this.prisma.driver.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Driver profile not found');
+    }
+
+    const activeShift = await this.prisma.driverShift.findFirst({
+      where: {
+        driverId: driver.id,
+        endTime: null,
+      },
+    });
+
+    if (!activeShift) {
+      return { active: false, shift: null };
+    }
+
+    // Get current shift stats
+    const shiftTrips = await this.prisma.trip.count({
+      where: {
+        driverId: driver.id,
+        status: 'completed',
+        completedAt: { gte: activeShift.startTime },
+      },
+    });
+
+    const shiftEarnings = await this.prisma.trip.aggregate({
+      where: {
+        driverId: driver.id,
+        status: 'completed',
+        completedAt: { gte: activeShift.startTime },
+      },
+      _sum: { finalFare: true },
+    });
+
+    const durationMinutes = Math.floor(
+      (Date.now() - activeShift.startTime.getTime()) / 60000
+    );
+
+    return {
+      active: true,
+      shift: {
+        id: activeShift.id,
+        startTime: activeShift.startTime,
+        duration: durationMinutes,
+        tripCount: shiftTrips,
+        earnings: Number(shiftEarnings._sum.finalFare || 0),
+      },
+    };
+  }
+
+  /**
+   * Get shift history
+   */
+  async getShiftHistory(userId: string, limit: number = 20) {
+    const driver = await this.prisma.driver.findUnique({
+      where: { userId },
+    });
+
+    if (!driver) {
+      throw new NotFoundException('Driver profile not found');
+    }
+
+    const shifts = await this.prisma.driverShift.findMany({
+      where: {
+        driverId: driver.id,
+        endTime: { not: null },
+      },
+      orderBy: { startTime: 'desc' },
+      take: limit,
+    });
+
+    return shifts.map((s) => ({
+      id: s.id,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      duration: s.duration,
+      tripCount: s.tripCount,
+      earnings: Number(s.earnings || 0),
+    }));
+  }
 }

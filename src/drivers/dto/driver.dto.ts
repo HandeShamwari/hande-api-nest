@@ -114,3 +114,47 @@ export class DriverStatsResponseDto {
   subscriptionExpiresAt: Date | null;
   currentStreak: number;
 }
+
+// ============================================================================
+// SHIFT MANAGEMENT DTOs
+// ============================================================================
+
+export class StartShiftDto {
+  @IsNumber()
+  @IsOptional()
+  latitude?: number;
+
+  @IsNumber()
+  @IsOptional()
+  longitude?: number;
+}
+
+export class EndShiftDto {
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}
+
+export class ShiftSummaryDto {
+  id: string;
+  startTime: Date;
+  endTime?: Date;
+  duration?: number; // minutes
+  earnings: number;
+  tripCount: number;
+  isActive: boolean;
+}
+
+export class ShiftHistoryQueryDto {
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsNumber()
+  limit?: number;
+}

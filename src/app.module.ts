@@ -10,6 +10,11 @@ import { HealthModule } from './health/health.module';
 import { TripsModule } from './trips/trips.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { JobsModule } from './jobs/jobs.module';
+import { RatingsModule } from './ratings/ratings.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { SupportModule } from './support/support.module';
+import { DocumentsModule } from './documents/documents.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -25,6 +30,11 @@ import { JobsModule } from './jobs/jobs.module';
     TripsModule,
     RealtimeModule,
     JobsModule,
+    RatingsModule,
+    NotificationsModule,
+    SupportModule,
+    DocumentsModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
