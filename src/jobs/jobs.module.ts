@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import Redis from 'ioredis';
 import { SubscriptionProcessor } from './processors/subscription.processor';
 import { NotificationProcessor } from './processors/notification.processor';
 import { ReportProcessor } from './processors/report.processor';
@@ -24,40 +25,48 @@ import { SharedModule } from '../shared/shared.module';
           
           console.log(`[Bull] Connecting to Redis at ${url.hostname}:${url.port} (TLS: ${isSecure})`);
           
+          // Base Redis options for Upstash
+          const redisOptions = {
+            host: url.hostname,
+            port: parseInt(url.port) || 6379,
+            username: url.username || 'default',
+            password: url.password,
+            maxRetriesPerRequest: null, // Required for Bull blocking operations
+            enableOfflineQueue: true,
+            connectTimeout: 10000,
+            ...(isSecure && {
+              tls: {
+                rejectUnauthorized: false,
+              },
+            }),
+          };
+          
           return {
-            redis: {
-              host: url.hostname,
-              port: parseInt(url.port) || 6379,
-              username: url.username || 'default',
-              password: url.password,
-              maxRetriesPerRequest: null, // Required for Bull to work with Upstash
-              enableOfflineQueue: true, // Queue commands while connecting
-              connectTimeout: 10000, // 10s for TLS handshake
-              retryDelayOnFailover: 100,
-              ...(isSecure && {
-                tls: {
-                  rejectUnauthorized: false,
-                },
-              }),
+            // Use createClient to control ALL Bull Redis connections
+            createClient: (type) => {
+              console.log(`[Bull] Creating Redis client for: ${type}`);
+              return new Redis(redisOptions);
             },
           };
         }
         
         // Fallback to individual env vars
         const redisTls = configService.get('REDIS_TLS', 'false') === 'true';
+        const fallbackOptions = {
+          host: configService.get('REDIS_HOST', 'localhost'),
+          port: configService.get('REDIS_PORT', 6379),
+          password: configService.get('REDIS_PASSWORD'),
+          maxRetriesPerRequest: null,
+          enableOfflineQueue: true,
+          ...(redisTls && {
+            tls: {
+              rejectUnauthorized: false,
+            },
+          }),
+        };
+        
         return {
-          redis: {
-            host: configService.get('REDIS_HOST', 'localhost'),
-            port: configService.get('REDIS_PORT', 6379),
-            password: configService.get('REDIS_PASSWORD'),
-            maxRetriesPerRequest: null,
-            enableOfflineQueue: true,
-            ...(redisTls && {
-              tls: {
-                rejectUnauthorized: false,
-              },
-            }),
-          },
+          createClient: () => new Redis(fallbackOptions),
         };
       },
       inject: [ConfigService],
