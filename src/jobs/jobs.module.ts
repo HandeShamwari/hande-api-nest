@@ -15,13 +15,29 @@ import { SharedModule } from '../shared/shared.module';
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
-        // Support both REDIS_URL and individual env vars
         const redisUrl = configService.get('REDIS_URL');
         
         if (redisUrl) {
-          // Use Redis URL (e.g., rediss://default:password@host:6379)
+          // Parse Redis URL for Upstash (requires TLS)
+          const url = new URL(redisUrl);
+          const isSecure = url.protocol === 'rediss:';
+          
+          console.log(`[Bull] Connecting to Redis at ${url.hostname}:${url.port} (TLS: ${isSecure})`);
+          
           return {
-            redis: redisUrl,
+            redis: {
+              host: url.hostname,
+              port: parseInt(url.port) || 6379,
+              username: url.username || 'default',
+              password: url.password,
+              maxRetriesPerRequest: 3,
+              enableOfflineQueue: false,
+              ...(isSecure && {
+                tls: {
+                  rejectUnauthorized: false,
+                },
+              }),
+            },
           };
         }
         
