@@ -49,5 +49,5 @@ EXPOSE 10000
 # Set environment to production
 ENV NODE_ENV=production
 
-# Start the application
-CMD ["node", "dist/src/main.js"]
+# Start the application (sync schema then start)
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/src/main.js"]
