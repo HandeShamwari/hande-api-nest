@@ -17,7 +17,7 @@ async function main() {
       lastName: 'Admin',
       email: 'admin@hande.com',
       password: adminPassword,
-      phone: '+263700000000',
+      phone: '+263782549577',
       userType: 'admin',
       activeRole: 'admin',
       isActive: true,
