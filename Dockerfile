@@ -9,8 +9,9 @@ COPY package*.json ./
 # Install all dependencies (including dev)
 RUN npm ci
 
-# Copy prisma schema and generate client
+# Copy prisma schema, config, and generate client
 COPY prisma ./prisma/
+COPY prisma.config.js ./
 RUN npx prisma generate
 
 # Copy source code and config files
@@ -33,8 +34,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy prisma and generate client
+# Copy prisma schema, config, and generate client
 COPY prisma ./prisma/
+COPY prisma.config.js ./
 RUN npx prisma generate
 
 # Copy built application from builder

@@ -1,13 +1,13 @@
 // Prisma 7 Configuration
 // Note: DATABASE_URL is only needed for migrations/db push, not for generate
-import { defineConfig } from "prisma/config";
+const { defineConfig } = require("prisma/config");
 
 // Load dotenv only if available (not in Docker build)
 try {
   require("dotenv/config");
-} catch {}
+} catch (e) {}
 
-export default defineConfig({
+module.exports = defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
