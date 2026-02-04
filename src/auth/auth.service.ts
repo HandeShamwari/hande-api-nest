@@ -78,7 +78,7 @@ export class AuthService {
         // Create vehicle if vehicle info provided
         if (registerDto.vehiclePlate || registerDto.vehicleMake) {
           this.logger.log(`Creating vehicle for driver: ${driver.id}`);
-          await this.prisma.vehicle.create({
+          await this.prisma.driverVehicle.create({
             data: {
               driverId: driver.id,
               type: registerDto.vehicleType || 'sedan',
