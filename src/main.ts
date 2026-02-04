@@ -2,11 +2,10 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from './shared/services/prisma.service';
 import * as bcrypt from 'bcrypt';
 
-async function seedAdminUser() {
-  const prisma = new PrismaClient();
+async function seedAdminUser(prisma: PrismaService) {
   try {
     const existingAdmin = await prisma.user.findFirst({
       where: { userType: 'admin' },
@@ -33,9 +32,7 @@ async function seedAdminUser() {
       console.log('✅ Admin user already exists:', existingAdmin.email);
     }
   } catch (error) {
-    console.error('⚠️ Admin seed skipped (may already exist):', error.message);
-  } finally {
-    await prisma.$disconnect();
+    console.error('⚠️ Admin seed skipped:', error.message);
   }
 }
 
@@ -62,8 +59,9 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api');
   
-  // Seed admin user on startup
-  await seedAdminUser();
+  // Seed admin user on startup using existing PrismaService
+  const prisma = app.get(PrismaService);
+  await seedAdminUser(prisma);
   
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
