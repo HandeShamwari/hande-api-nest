@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsString, MinLength, IsOptional } from 'class-validator';
+import { IsEmail, IsEnum, IsString, MinLength, IsOptional, IsNumber } from 'class-validator';
 
 export enum UserType {
   ADMIN = 'admin',
@@ -26,4 +26,33 @@ export class RegisterDto {
 
   @IsEnum(UserType)
   userType: UserType;
+
+  // Driver-specific fields (optional, only used when userType is 'driver')
+  @IsString()
+  @IsOptional()
+  licenseNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  vehicleType?: string;
+
+  @IsString()
+  @IsOptional()
+  vehicleMake?: string;
+
+  @IsString()
+  @IsOptional()
+  vehicleModel?: string;
+
+  @IsNumber()
+  @IsOptional()
+  vehicleYear?: number;
+
+  @IsString()
+  @IsOptional()
+  vehiclePlate?: string;
+
+  @IsString()
+  @IsOptional()
+  vehicleColor?: string;
 }

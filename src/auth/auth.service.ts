@@ -65,15 +65,32 @@ export class AuthService {
         licenseExpiry.setFullYear(licenseExpiry.getFullYear() + 5);
         
         this.logger.log(`Creating driver profile for user: ${user.id}`);
-        await this.prisma.driver.create({
+        const driver = await this.prisma.driver.create({
           data: {
             userId: user.id,
-            licenseNumber: 'PENDING',
+            licenseNumber: registerDto.licenseNumber || 'PENDING',
             licenseExpiryDate: licenseExpiry,
             licenseType: 'B',
             yearsOfExperience: 0,
           },
         });
+
+        // Create vehicle if vehicle info provided
+        if (registerDto.vehiclePlate || registerDto.vehicleMake) {
+          this.logger.log(`Creating vehicle for driver: ${driver.id}`);
+          await this.prisma.vehicle.create({
+            data: {
+              driverId: driver.id,
+              type: registerDto.vehicleType || 'sedan',
+              make: registerDto.vehicleMake || '',
+              model: registerDto.vehicleModel || '',
+              year: registerDto.vehicleYear || new Date().getFullYear(),
+              color: registerDto.vehicleColor || '',
+              plateNumber: registerDto.vehiclePlate || '',
+              isActive: true,
+            },
+          });
+        }
       } else if (registerDto.userType === 'rider') {
         this.logger.log(`Creating rider profile for user: ${user.id}`);
         await this.prisma.rider.create({
