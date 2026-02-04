@@ -86,7 +86,8 @@ export class AuthService {
               model: registerDto.vehicleModel || '',
               year: registerDto.vehicleYear || new Date().getFullYear(),
               color: registerDto.vehicleColor || '',
-              plateNumber: registerDto.vehiclePlate || '',
+              licensePlate: registerDto.vehiclePlate || '',
+              capacity: 4,
               isActive: true,
             },
           });
