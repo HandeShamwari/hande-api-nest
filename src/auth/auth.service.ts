@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../shared/services/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -135,6 +136,74 @@ export class AuthService {
       },
       token,
     };
+  }
+
+  async googleAuth(googleAuthDto: GoogleAuthDto) {
+    const { email, googleId, firstName, lastName, profileImage } = googleAuthDto;
+    this.logger.log(`Google auth attempt for: ${email}`);
+
+    try {
+      // Check if user exists by email or googleId
+      let user = await this.prisma.user.findFirst({
+        where: {
+          OR: [
+            { email },
+            { googleId },
+          ],
+        },
+      });
+
+      if (!user) {
+        // Create new user with Google
+        this.logger.log(`Creating new user with Google: ${email}`);
+        user = await this.prisma.user.create({
+          data: {
+            email,
+            firstName: firstName || '',
+            lastName: lastName || '',
+            googleId,
+            profileImage,
+            password: '', // No password for Google users
+            userType: 'rider',
+            activeRole: 'rider',
+          },
+        });
+
+        // Create rider profile
+        await this.prisma.rider.create({
+          data: { userId: user.id },
+        });
+      } else if (!user.googleId) {
+        // Link Google account to existing user
+        this.logger.log(`Linking Google account to existing user: ${email}`);
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            googleId,
+            profileImage: profileImage || user.profileImage,
+          },
+        });
+      }
+
+      const token = this.generateToken(user.id, user.email, user.userType);
+
+      this.logger.log(`Google auth successful for: ${email}`);
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          userType: user.userType,
+          activeRole: user.activeRole,
+          profileImage: user.profileImage,
+        },
+        accessToken: token,
+      };
+    } catch (error) {
+      this.logger.error(`Google auth failed for ${email}:`, error.message, error.stack);
+      throw new InternalServerErrorException('Google authentication failed. Please try again.');
+    }
   }
 
   private generateToken(userId: string, email: string, userType: string) {

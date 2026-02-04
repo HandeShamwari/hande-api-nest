@@ -24,6 +24,7 @@ model User {
   phoneVerifiedAt   DateTime? @map("phone_verified_at") @db.Timestamptz
   password          String    @db.VarChar(255)
   phone             String?   @db.VarChar(20)
+  googleId          String?   @unique @map("google_id") @db.VarChar(255)
   userType          UserType  @default(rider) @map("user_type")
   activeRole        UserType? @map("active_role")
   profileImage      String?   @map("profile_image") @db.VarChar(255)
