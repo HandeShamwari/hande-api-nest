@@ -16,6 +16,7 @@ import { SupportModule } from './support/support.module';
 import { DocumentsModule } from './documents/documents.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AdminModule } from './admin/admin.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { AdminModule } from './admin/admin.module';
     SupportModule,
     DocumentsModule,
     PaymentsModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

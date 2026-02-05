@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@googlemaps/google-maps-services-js": "^3.4.2",
+    "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/bull": "^11.0.4",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/common": "^11.0.1",
@@ -46,8 +47,10 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "firebase-admin": "^13.6.0",
+    "handlebars": "^4.7.8",
     "ioredis": "^5.9.2",
     "multer": "^2.0.2",
+    "nodemailer": "^8.0.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.18.0",
